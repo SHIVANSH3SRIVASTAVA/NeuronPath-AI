@@ -5,15 +5,29 @@ import { Send, Brain } from 'lucide-react';
 
 interface OnboardingChatProps {
   onComplete: (data: { name: string; goalText: string }) => void;
+  initialName?: string;
 }
 
-export function OnboardingChat({ onComplete }: OnboardingChatProps) {
-  const [step, setStep] = useState<'name' | 'goal'>('name');
-  const [name, setName] = useState('');
-  const nameRef = useRef('');
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: "👋 Welcome to NeuronPath! I'm your AI learning coach. Let's set up your personalized path.\n\nFirst, what's your name?" }
-  ]);
+export function OnboardingChat({ onComplete, initialName }: OnboardingChatProps) {
+  const hasName = Boolean(initialName && initialName.trim());
+  const [step, setStep] = useState<'name' | 'goal'>(hasName ? 'goal' : 'name');
+  const [name, setName] = useState(initialName?.trim() || '');
+  const nameRef = useRef(initialName?.trim() || '');
+  const [messages, setMessages] = useState(() => (
+    hasName
+      ? [
+          {
+            role: 'assistant',
+            content: `👋 Welcome to NeuronPath, ${initialName!.trim()}! I'm your AI learning coach. Let's set up your personalized roadmap.\n\nTell me about your learning goal. Be as specific as you like!\n\nFor example:\n• "I want to become a Machine Learning Engineer in 6 months"\n• "I'm a beginner in Python and want to master data science"\n• "I know SQL and Python basics, aiming for a senior data analyst role"`
+          }
+        ]
+      : [
+          {
+            role: 'assistant',
+            content: "👋 Welcome to NeuronPath! I'm your AI learning coach. Let's set up your personalized path.\n\nFirst, what's your name?"
+          }
+        ]
+  ));
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +53,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
         }]);
       }, 300);
     } else if (step === 'goal') {
-      const learnerName = nameRef.current || name || 'Learner';
+      const learnerName = nameRef.current || name || initialName || 'Learner';
       setTimeout(() => {
         setMessages(prev => [...prev, { 
           role: 'assistant', 

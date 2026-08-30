@@ -152,7 +152,7 @@ export default function Onboarding() {
 
         {stage === 'chat' && !loading && (
           <div className="shadow-sm rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <OnboardingChat onComplete={handleChatComplete} />
+            <OnboardingChat onComplete={handleChatComplete} initialName={currentLearner?.name} />
           </div>
         )}
 
