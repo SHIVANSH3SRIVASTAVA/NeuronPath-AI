@@ -29,10 +29,12 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     
+    const goalId = activeGoal?.id;
+
     Promise.allSettled([
-      getProgress(currentLearner.id),
-      fetchNextAction(currentLearner.id),
-      getRoadmap(currentLearner.id),
+      getProgress(currentLearner.id, goalId),
+      fetchNextAction(currentLearner.id, goalId),
+      getRoadmap(currentLearner.id, goalId),
     ]).then(([progResult, actionResult, roadmapResult]) => {
       if (progResult.status === 'fulfilled') {
         setProgressData(progResult.value);
@@ -96,7 +98,7 @@ export default function Dashboard() {
     );
   }
 
-  const goalTitle = roadmap?.goal?.title || 'Personalized Learning Goal';
+  const goalTitle = activeGoal ? (activeGoal.target_role || activeGoal.title) : (roadmap?.goal?.title || 'Personalized Learning Goal');
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10">

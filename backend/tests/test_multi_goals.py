@@ -110,3 +110,65 @@ def test_multi_goal_lifecycle():
         db.delete(l_clean)
         db.commit()
     db.close()
+
+def test_goal_content_isolation_and_switching():
+    email = 'isolation_test@neuronpath.dev'
+    db = SessionLocal()
+    existing = db.query(Learner).filter(Learner.email == email).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+    db.close()
+
+    res_reg = client.post('/api/auth/register', json={
+        'name': 'Isolation Tester',
+        'email': email,
+        'password': 'Password123!'
+    })
+    assert res_reg.status_code == 201
+    token = res_reg.json()['access_token']
+    lid = res_reg.json()['learner']['id']
+    headers = {'Authorization': f'Bearer {token}'}
+
+    # 1. Onboard with Goal 1: C Developer
+    res_onb = client.post(f'/api/learners/{lid}/onboard', json={
+        'goal_text': 'I want to master C Programming and embedded systems'
+    }, headers=headers)
+    assert res_onb.status_code == 200
+    g_c_id = res_onb.json()['goal_id']
+
+    # 2. Add Goal 2: Full Stack Developer
+    res_add = client.post('/api/goals', json={
+        'title': 'Full Stack Developer',
+        'target_role': 'Full Stack Developer',
+        'timeline_months': 6,
+        'set_active': True
+    }, headers=headers)
+    assert res_add.status_code == 201
+    g_fs_id = res_add.json()['id']
+
+    # 3. Check that Full Stack Developer (Active) displays Full Stack content
+    res_rm_fs = client.get(f'/api/learners/{lid}/roadmap?goal_id={g_fs_id}', headers=headers)
+    assert res_rm_fs.status_code == 200
+    assert res_rm_fs.json()['goal_id'] == g_fs_id
+
+    res_prog_fs = client.get(f'/api/learners/{lid}/progress?goal_id={g_fs_id}', headers=headers)
+    assert res_prog_fs.status_code == 200
+    fs_skills = [s['name'] for s in res_prog_fs.json()['categorized_skills']['missing'] + res_prog_fs.json()['categorized_skills']['developing'] + res_prog_fs.json()['categorized_skills']['weak'] + res_prog_fs.json()['categorized_skills']['mastered']]
+    # Verify web/full stack skills are present and not only C
+    assert any('JavaScript' in s or 'HTML' in s or 'React' in s or 'CSS' in s or 'SQL' in s for s in fs_skills)
+
+    # 4. Switch to C Developer and verify content switches to C
+    client.put(f'/api/goals/{g_c_id}/activate', headers=headers)
+    res_rm_c = client.get(f'/api/learners/{lid}/roadmap?goal_id={g_c_id}', headers=headers)
+    assert res_rm_c.status_code == 200
+    assert res_rm_c.json()['goal_id'] == g_c_id
+
+    # Clean up
+    db = SessionLocal()
+    l_clean = db.query(Learner).filter(Learner.id == lid).first()
+    if l_clean:
+        db.delete(l_clean)
+        db.commit()
+    db.close()
+

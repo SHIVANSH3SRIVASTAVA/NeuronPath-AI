@@ -18,7 +18,7 @@ export default function ProgressPage() {
     if (!currentLearner) return;
     setLoading(true);
     setError(null);
-    getProgress(currentLearner.id)
+    getProgress(currentLearner.id, activeGoal?.id)
       .then(setProgressData)
       .catch(err => {
         console.error(err);

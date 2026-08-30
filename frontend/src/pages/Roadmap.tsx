@@ -23,7 +23,7 @@ export default function RoadmapPage() {
     setLoading(true);
     setError(null);
     try {
-      const rMap = await getRoadmap(currentLearner.id);
+      const rMap = await getRoadmap(currentLearner.id, activeGoal?.id);
       setRoadmap(rMap);
       return rMap;
     } catch (err: any) {
@@ -43,9 +43,8 @@ export default function RoadmapPage() {
     setProcessing(true);
     setError(null);
     try {
-      await generateRoadmap(currentLearner.id);
-      const newRoadmap = await getRoadmap(currentLearner.id);
-      setRoadmap(newRoadmap);
+      await generateRoadmap(currentLearner.id, activeGoal?.id);
+      await fetchRoadmap();
       setSelectedMilestone(null);
     } catch (err: any) {
       console.error('Roadmap calculation error:', err);

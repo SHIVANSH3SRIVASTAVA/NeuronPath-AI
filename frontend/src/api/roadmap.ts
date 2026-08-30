@@ -1,13 +1,14 @@
 import { apiClient } from './client';
 import { Roadmap } from '../types';
 
-export const getRoadmap = async (learnerId: number) => {
-  const { data } = await apiClient.get<Roadmap>(`/learners/${learnerId}/roadmap`);
+export const getRoadmap = async (learnerId: number, goalId?: number) => {
+  const config = goalId ? { params: { goal_id: goalId } } : undefined;
+  const { data } = await apiClient.get<Roadmap>(`/learners/${learnerId}/roadmap`, config);
   return data;
 };
 
-export const generateRoadmap = async (learnerId: number) => {
-  const { data } = await apiClient.post<Roadmap>(`/learners/${learnerId}/roadmap`, {});
+export const generateRoadmap = async (learnerId: number, goalId?: number) => {
+  const { data } = await apiClient.post<Roadmap>(`/learners/${learnerId}/roadmap`, goalId ? { goal_id: goalId } : {});
   return data;
 };
 

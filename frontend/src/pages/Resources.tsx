@@ -28,7 +28,7 @@ export default function Resources() {
     if (!currentLearner) return;
     setLoading(true);
     setError(null);
-    getRecommendations(currentLearner.id)
+    getRecommendations(currentLearner.id, activeGoal?.id)
       .then(setRecommendations)
       .catch(err => {
         console.error('Recommendations load error:', err);

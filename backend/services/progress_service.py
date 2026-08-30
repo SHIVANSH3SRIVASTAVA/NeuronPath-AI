@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session, selectinload, joinedload
+from typing import Optional
 from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem
 from models.skill import LearnerSkill
 from models.resource import Resource
@@ -7,16 +8,22 @@ from models.activity import LearningActivity
 from models.learner import Learner
 from datetime import datetime
 
-def get_progress(db: Session, learner_id: int):
+def get_progress(db: Session, learner_id: int, goal_id: Optional[int] = None):
     """Calculate comprehensive progress data for a learner with semantic timeline growth."""
     learner = db.query(Learner).filter(Learner.id == learner_id).first()
 
     # Find active goal
     from models.roadmap import LearnerGoal, GoalSkillRequirement
-    active_goal = db.query(LearnerGoal).filter(
-        LearnerGoal.learner_id == learner_id,
-        LearnerGoal.status == "active"
-    ).first()
+    if goal_id:
+        active_goal = db.query(LearnerGoal).filter(
+            LearnerGoal.id == goal_id,
+            LearnerGoal.learner_id == learner_id
+        ).first()
+    else:
+        active_goal = db.query(LearnerGoal).filter(
+            LearnerGoal.learner_id == learner_id,
+            LearnerGoal.status == "active"
+        ).order_by(LearnerGoal.id.desc()).first()
 
     # Find latest roadmap for active goal (active or completed)
     roadmap_filter = [Roadmap.learner_id == learner_id, Roadmap.status.in_(["active", "completed"])]

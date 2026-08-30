@@ -271,8 +271,8 @@ class ActionPayload(BaseModel):
     extra: Optional[dict] = None
 
 @router.get("/{learner_id}/next-action")
-def learner_next_action(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
-    return get_next_action(db, learner_id)
+def learner_next_action(learner_id: int, goal_id: Optional[int] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+    return get_next_action(db, learner_id, goal_id=goal_id)
 
 @router.post("/{learner_id}/roadmap")
 def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
@@ -287,11 +287,17 @@ def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = N
     }
 
 @router.get("/{learner_id}/roadmap", response_model=RoadmapResponse)
-def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
-    active_goal = db.query(LearnerGoal).filter(
-        LearnerGoal.learner_id == learner_id,
-        LearnerGoal.status == "active"
-    ).first()
+def get_learner_roadmap(learner_id: int, goal_id: Optional[int] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+    if goal_id:
+        active_goal = db.query(LearnerGoal).filter(
+            LearnerGoal.id == goal_id,
+            LearnerGoal.learner_id == learner_id
+        ).first()
+    else:
+        active_goal = db.query(LearnerGoal).filter(
+            LearnerGoal.learner_id == learner_id,
+            LearnerGoal.status == "active"
+        ).order_by(LearnerGoal.id.desc()).first()
     
     roadmap_filter = [Roadmap.learner_id == learner_id, Roadmap.status.in_(["active", "completed"])]
     if active_goal:

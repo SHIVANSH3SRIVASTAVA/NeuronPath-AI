@@ -33,12 +33,13 @@ export const updateLearnerGoal = async (id: number, data: {
   return res;
 };
 
-export const getNextAction = async (id: number) => {
+export const getNextAction = async (id: number, goalId?: number) => {
+  const config = goalId ? { params: { goal_id: goalId } } : undefined;
   try {
-    const { data } = await apiClient.get<NextAction>(`/learners/${id}/roadmap/next-action`);
+    const { data } = await apiClient.get<NextAction>(`/learners/${id}/roadmap/next-action`, config);
     return data;
   } catch {
-    const { data } = await apiClient.get<NextAction>(`/learners/${id}/next-action`);
+    const { data } = await apiClient.get<NextAction>(`/learners/${id}/next-action`, config);
     return data;
   }
 };

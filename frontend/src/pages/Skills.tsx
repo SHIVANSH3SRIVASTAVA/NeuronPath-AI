@@ -19,7 +19,7 @@ export default function Skills() {
     if (!currentLearner) return;
     setLoading(true);
     setError(null);
-    getSkillGaps(currentLearner.id)
+    getSkillGaps(currentLearner.id, activeGoal?.id)
       .then(res => {
         const mappedGaps: SkillGap[] = res.map((r: any) => ({
           skill: {

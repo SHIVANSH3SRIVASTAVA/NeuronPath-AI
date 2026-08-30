@@ -9,6 +9,7 @@ from services.progress_service import get_progress as get_progress_data
 router = APIRouter()
 
 @router.get("")
-def get_progress(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
-    return get_progress_data(db, learner_id)
+def get_progress(learner_id: int, goal_id: Optional[int] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+    return get_progress_data(db, learner_id, goal_id=goal_id)
+
 

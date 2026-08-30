@@ -165,8 +165,8 @@ def generate_roadmap(db: Session, learner_id: int, goal_id: Optional[int] = None
     else:
         goal = db.query(LearnerGoal).filter(
             LearnerGoal.learner_id == learner_id, 
-            LearnerGoal.status.in_(["active", "completed"])
-        ).first()
+            LearnerGoal.status == "active"
+        ).order_by(LearnerGoal.id.desc()).first()
     
     if not goal:
         return None
@@ -300,11 +300,17 @@ def generate_roadmap(db: Session, learner_id: int, goal_id: Optional[int] = None
     db.commit()
     return roadmap
 
-def get_next_action(db: Session, learner_id: int):
-    active_goal = db.query(LearnerGoal).filter(
-        LearnerGoal.learner_id == learner_id, 
-        LearnerGoal.status.in_(["active", "completed"])
-    ).first()
+def get_next_action(db: Session, learner_id: int, goal_id: Optional[int] = None):
+    if goal_id:
+        active_goal = db.query(LearnerGoal).filter(
+            LearnerGoal.id == goal_id,
+            LearnerGoal.learner_id == learner_id
+        ).first()
+    else:
+        active_goal = db.query(LearnerGoal).filter(
+            LearnerGoal.learner_id == learner_id, 
+            LearnerGoal.status == "active"
+        ).order_by(LearnerGoal.id.desc()).first()
     
     if not active_goal:
         return {
@@ -320,6 +326,9 @@ def get_next_action(db: Session, learner_id: int):
         Roadmap.status.in_(["active", "completed"])
     ).order_by(Roadmap.created_at.desc()).first()
     
+    if not roadmap:
+        roadmap = generate_roadmap(db, learner_id, goal_id=active_goal.id)
+        
     if not roadmap:
         return {
             "action": "create_goal", 
