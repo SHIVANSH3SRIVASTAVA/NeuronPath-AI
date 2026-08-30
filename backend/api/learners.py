@@ -9,10 +9,11 @@ from services.roadmap_service import generate_roadmap, recalculate_roadmap_miles
 from ai.provider import LLMProvider
 from ai.onboarding import extract_goal_from_text
 from models.learner import Learner
-from models.roadmap import LearnerGoal, Roadmap, RoadmapMilestone, MilestoneItem
+from models.roadmap import LearnerGoal, GoalSkillRequirement, Roadmap, RoadmapMilestone, MilestoneItem
 from models.skill import Skill, LearnerSkill
 from models.resource import Resource
-from models.activity import LearningActivity
+from models.activity import LearningActivity, ChatMessage, Recommendation
+from models.assessment import Assessment, AssessmentQuestion, AssessmentAttempt
 from recommendation.skill_gap import calculate_system_confidence
 from core.deps import verify_learner_access
 from typing import List, Optional

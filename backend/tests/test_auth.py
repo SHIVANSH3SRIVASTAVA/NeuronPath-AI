@@ -109,6 +109,48 @@ def test_delete_account_and_isolation():
     user_a_id = res_a.json()["learner"]["id"]
     token_a = res_a.json()["access_token"]
 
+    # Populate User A with dependent data: Goal, GoalSkillRequirement, Roadmap, Milestones, Skills, Activities, Chat
+    from models.roadmap import LearnerGoal, GoalSkillRequirement, Roadmap, RoadmapMilestone, MilestoneItem
+    from models.skill import LearnerSkill, Skill
+    from models.activity import LearningActivity, ChatMessage, Recommendation
+    from models.assessment import Assessment, AssessmentAttempt, AssessmentQuestion
+    
+    db = SessionLocal()
+    # Create Goal and GoalSkillRequirement
+    skill = db.query(Skill).first()
+    skill_id = skill.id if skill else 1
+    goal = LearnerGoal(learner_id=user_a_id, title="Become ML Eng", target_role="ML Engineer", timeline_months=6)
+    db.add(goal)
+    db.commit()
+    db.refresh(goal)
+    
+    req = GoalSkillRequirement(goal_id=goal.id, skill_id=skill_id, required_proficiency=80.0)
+    db.add(req)
+    
+    # Create Roadmap, Milestone, and Item
+    rm = Roadmap(learner_id=user_a_id, goal_id=goal.id, status="active")
+    db.add(rm)
+    db.commit()
+    db.refresh(rm)
+    
+    ms = RoadmapMilestone(roadmap_id=rm.id, title="Foundations", order_index=0, status="in_progress")
+    db.add(ms)
+    db.commit()
+    db.refresh(ms)
+    
+    item = MilestoneItem(milestone_id=ms.id, item_type="resource", status="not_started")
+    db.add(item)
+    
+    # Create LearnerSkill, LearningActivity, ChatMessage, Recommendation
+    ls = LearnerSkill(learner_id=user_a_id, skill_id=skill_id, self_reported_level=50.0)
+    act = LearningActivity(learner_id=user_a_id, activity_type="resource_complete")
+    chat = ChatMessage(learner_id=user_a_id, role="user", content="Hello coach")
+    rec = Recommendation(learner_id=user_a_id, resource_id=1, score=90.0, explanation="Top pick")
+    
+    db.add_all([ls, act, chat, rec])
+    db.commit()
+    db.close()
+
     res_b = client.post("/api/auth/register", json={
         "name": "User To Keep",
         "email": "keep_me@test.com",
@@ -127,9 +169,19 @@ def test_delete_account_and_isolation():
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "success"
 
-    # 4. Verify User A no longer exists in database
+    # 4. Verify User A and all dependent data no longer exist in database
     db = SessionLocal()
     assert db.query(Learner).filter(Learner.id == user_a_id).first() is None
+    assert db.query(LearnerGoal).filter(LearnerGoal.learner_id == user_a_id).first() is None
+    assert db.query(GoalSkillRequirement).filter(GoalSkillRequirement.goal_id == goal.id).first() is None
+    assert db.query(Roadmap).filter(Roadmap.learner_id == user_a_id).first() is None
+    assert db.query(RoadmapMilestone).filter(RoadmapMilestone.roadmap_id == rm.id).first() is None
+    assert db.query(MilestoneItem).filter(MilestoneItem.milestone_id == ms.id).first() is None
+    assert db.query(LearnerSkill).filter(LearnerSkill.learner_id == user_a_id).first() is None
+    assert db.query(LearningActivity).filter(LearningActivity.learner_id == user_a_id).first() is None
+    assert db.query(ChatMessage).filter(ChatMessage.learner_id == user_a_id).first() is None
+    assert db.query(Recommendation).filter(Recommendation.learner_id == user_a_id).first() is None
+
     # 5. Verify User B is completely untouched and intact
     assert db.query(Learner).filter(Learner.id == user_b_id).first() is not None
     db.close()
