@@ -8,6 +8,7 @@ class Learner(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     email = Column(String, unique=True, index=True, nullable=True)
+    hashed_password = Column(String, nullable=True)
     experience_level = Column(String, default="beginner") # beginner/intermediate/advanced
     weekly_hours = Column(Float, default=10.0)
     learning_style = Column(String, nullable=True)

@@ -36,7 +36,10 @@ const getInitialTheme = (): 'light' | 'dark' => {
 };
 
 interface AppState {
+  token: string | null;
   currentLearner: Learner | null;
+  isAuthenticated: boolean;
+  setAuth: (token: string, learner: Learner) => void;
   setCurrentLearner: (learner: Learner | null) => void;
   isOnboarded: boolean;
   setOnboarded: (status: boolean) => void;
@@ -55,8 +58,24 @@ applyThemeToDom(initialTheme);
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
+      token: null,
       currentLearner: null,
-      setCurrentLearner: (learner) => set({ currentLearner: learner }),
+      isAuthenticated: false,
+      setAuth: (token, learner) => {
+        try {
+          localStorage.setItem('neuronpath-token', token);
+        } catch (e) {}
+        set({ 
+          token, 
+          currentLearner: learner, 
+          isAuthenticated: true, 
+          isOnboarded: true 
+        });
+      },
+      setCurrentLearner: (learner) => set({ 
+        currentLearner: learner,
+        isAuthenticated: !!learner
+      }),
       isOnboarded: false,
       setOnboarded: (status) => set({ isOnboarded: status }),
       sidebarOpen: false,
@@ -73,18 +92,33 @@ export const useAppStore = create<AppState>()(
         applyThemeToDom(theme);
         set({ theme });
       },
-      logout: () => set({ currentLearner: null, isOnboarded: false }),
+      logout: () => {
+        try {
+          localStorage.removeItem('neuronpath-token');
+        } catch (e) {}
+        set({ 
+          token: null, 
+          currentLearner: null, 
+          isAuthenticated: false, 
+          isOnboarded: false 
+        });
+      },
     }),
     {
       name: 'neuronpath-storage',
       partialize: (state) => ({
+        token: state.token,
         currentLearner: state.currentLearner,
+        isAuthenticated: state.isAuthenticated,
         isOnboarded: state.isOnboarded,
         theme: state.theme,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyThemeToDom(state.theme || 'light');
+          if (state.token && state.currentLearner) {
+            state.isAuthenticated = true;
+          }
         }
       },
     }

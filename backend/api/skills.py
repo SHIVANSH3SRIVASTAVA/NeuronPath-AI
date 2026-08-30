@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from typing import Optional
 from database import get_db
+from models.learner import Learner
+from core.deps import verify_learner_access
 from schemas.skill import LearnerSkillResponse, LearnerSkillUpdate, SkillGapResponse
 from services.skill_service import get_learner_skills, update_learner_skill
 from models.roadmap import LearnerGoal, GoalSkillRequirement
@@ -9,15 +12,15 @@ from recommendation.skill_gap import calculate_skill_gaps
 router = APIRouter()
 
 @router.get("", response_model=list[LearnerSkillResponse])
-def get_skills(learner_id: int, db: Session = Depends(get_db)):
+def get_skills(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     return get_learner_skills(db, learner_id)
 
 @router.put("/{skill_id}", response_model=LearnerSkillResponse)
-def update_skill(learner_id: int, skill_id: int, req: LearnerSkillUpdate, db: Session = Depends(get_db)):
+def update_skill(learner_id: int, skill_id: int, req: LearnerSkillUpdate, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     return update_learner_skill(db, learner_id, skill_id, req.self_reported_level, req.demonstrated_level)
 
 @router.get("/gaps", response_model=list[SkillGapResponse])
-def get_skill_gaps(learner_id: int, db: Session = Depends(get_db)):
+def get_skill_gaps(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     goal = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id, LearnerGoal.status == "active").first()
     if not goal:
         return []

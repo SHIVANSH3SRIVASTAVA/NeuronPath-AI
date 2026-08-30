@@ -229,3 +229,22 @@ export interface OnboardingResult {
   learning_style?: string;
   preferred_formats?: string[];
 }
+
+export interface AuthResponse {
+  status: string;
+  access_token: string;
+  token_type: string;
+  learner: Learner;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password?: string;
+}
+
+export interface RegisterCredentials {
+  name: string;
+  email: string;
+  password?: string;
+}
+

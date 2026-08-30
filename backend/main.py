@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy import text
 
 def run_migrations():
-    """Ensure newly added columns exist in sqlite tables."""
+    """Ensure newly added columns exist in database tables."""
     Base.metadata.create_all(bind=engine)
     with engine.connect() as conn:
         try:
@@ -17,6 +17,14 @@ def run_migrations():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE learners ADD COLUMN hashed_password TEXT"))
+            conn.commit()
+        except Exception:
+            pass
+
+# Run migrations on module load to guarantee schema readiness
+run_migrations()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

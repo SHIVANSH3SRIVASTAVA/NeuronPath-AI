@@ -23,31 +23,36 @@ const formatError = (err: any): string => {
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { setCurrentLearner, setOnboarded } = useAppStore();
+  const { currentLearner, setCurrentLearner, setOnboarded } = useAppStore();
   const [stage, setStage] = useState<'chat' | 'confirm'>('chat');
   const [profileData, setProfileData] = useState<(OnboardingResult & { name?: string }) | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [learnerId, setLearnerId] = useState<number | null>(null);
+  const [learnerId, setLearnerId] = useState<number | null>(currentLearner?.id || null);
 
   const handleChatComplete = async (data: { name: string; goalText: string }) => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Create a new learner with their actual name
-      const learner = await createLearner({ name: data.name });
-      setLearnerId(learner.id);
-      setCurrentLearner(learner);
+      let activeLearner = currentLearner;
+      if (!activeLearner) {
+        activeLearner = await createLearner({ name: data.name });
+        setCurrentLearner(activeLearner);
+      } else if (data.name && data.name !== activeLearner.name) {
+        activeLearner = await updateLearner(activeLearner.id, { name: data.name });
+        setCurrentLearner(activeLearner);
+      }
+      setLearnerId(activeLearner.id);
 
       // 2. Onboard the learner with goal text
-      const result = await onboardLearner(learner.id, data.goalText);
+      const result = await onboardLearner(activeLearner.id, data.goalText);
       
       // 3. Refresh learner data
-      const updatedLearner = await getLearner(learner.id);
+      const updatedLearner = await getLearner(activeLearner.id);
       setCurrentLearner(updatedLearner);
 
       setProfileData({
-        name: data.name,
+        name: data.name || updatedLearner.name,
         goal: result.goal || data.goalText,
         target_role: result.target_role || 'Software & Data Professional',
         experience_level: result.experience_level || updatedLearner.experience_level || 'beginner',

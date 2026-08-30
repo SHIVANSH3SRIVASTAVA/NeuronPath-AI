@@ -1,3 +1,4 @@
+from .auth import router as auth_router
 from .learners import router as learners_router
 from .goals import router as goals_router
 from .skills import router as skills_router
@@ -9,6 +10,7 @@ from .coach import router as coach_router
 from .resources import router as resources_router
 
 routers = [
+    (auth_router, "/api/auth", ["auth"]),
     (learners_router, "/api/learners", ["learners"]),
     (goals_router, "/api/goals", ["goals"]),
     (skills_router, "/api/learners/{learner_id}/skills", ["skills"]),

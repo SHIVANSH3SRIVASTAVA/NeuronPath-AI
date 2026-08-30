@@ -19,7 +19,7 @@ interface NotificationItem {
 
 export default function TopBar() {
   const navigate = useNavigate();
-  const { currentLearner, setCurrentLearner, setOnboarded, toggleSidebar, theme, toggleTheme } = useAppStore();
+  const { currentLearner, logout, toggleSidebar, theme, toggleTheme } = useAppStore();
   
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -80,10 +80,9 @@ export default function TopBar() {
   };
 
   const handleLogout = () => {
-    setCurrentLearner(null);
-    setOnboarded(false);
+    logout();
     setShowProfileMenu(false);
-    navigate('/');
+    navigate('/login');
   };
 
   const handleNotifClick = (link: string) => {

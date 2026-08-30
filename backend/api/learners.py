@@ -8,11 +8,13 @@ from services.goal_service import create_goal
 from services.roadmap_service import generate_roadmap, recalculate_roadmap_milestone_statuses, get_next_action
 from ai.provider import LLMProvider
 from ai.onboarding import extract_goal_from_text
+from models.learner import Learner
 from models.roadmap import LearnerGoal, Roadmap, RoadmapMilestone, MilestoneItem
 from models.skill import Skill, LearnerSkill
 from models.resource import Resource
 from models.activity import LearningActivity
 from recommendation.skill_gap import calculate_system_confidence
+from core.deps import verify_learner_access
 from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload, joinedload
@@ -34,21 +36,21 @@ def create_new_learner(learner: LearnerCreate, db: Session = Depends(get_db)):
     return create_learner(db, learner)
 
 @router.get("/{learner_id}", response_model=LearnerResponse)
-def read_learner(learner_id: int, db: Session = Depends(get_db)):
+def read_learner(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     db_learner = get_learner(db, learner_id)
     if db_learner is None:
         raise HTTPException(status_code=404, detail="Learner not found")
     return db_learner
 
 @router.put("/{learner_id}", response_model=LearnerResponse)
-def update_existing_learner(learner_id: int, learner: LearnerUpdate, db: Session = Depends(get_db)):
+def update_existing_learner(learner_id: int, learner: LearnerUpdate, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     db_learner = update_learner(db, learner_id, learner)
     if db_learner is None:
         raise HTTPException(status_code=404, detail="Learner not found")
     return db_learner
 
 @router.post("/{learner_id}/onboard", response_model=OnboardingResponse)
-async def onboard_learner(learner_id: int, req: OnboardingRequest, db: Session = Depends(get_db)):
+async def onboard_learner(learner_id: int, req: OnboardingRequest, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     db_learner = get_learner(db, learner_id)
     if not db_learner:
         raise HTTPException(status_code=404, detail="Learner not found")
@@ -106,7 +108,7 @@ async def onboard_learner(learner_id: int, req: OnboardingRequest, db: Session =
 
 @router.post("/{learner_id}/goal")
 @router.put("/{learner_id}/goal")
-def set_or_update_goal(learner_id: int, req: CustomGoalUpdateRequest, db: Session = Depends(get_db)):
+def set_or_update_goal(learner_id: int, req: CustomGoalUpdateRequest, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     """Update learner goal and profile directly (used during Edit Manually)."""
     db_learner = get_learner(db, learner_id)
     if not db_learner:
@@ -149,11 +151,11 @@ class ActionPayload(BaseModel):
     extra: Optional[dict] = None
 
 @router.get("/{learner_id}/next-action")
-def learner_next_action(learner_id: int, db: Session = Depends(get_db)):
+def learner_next_action(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     return get_next_action(db, learner_id)
 
 @router.post("/{learner_id}/roadmap")
-def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
+def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     roadmap = generate_roadmap(db, learner_id)
     if not roadmap:
         raise HTTPException(status_code=400, detail="Could not generate roadmap")
@@ -165,7 +167,7 @@ def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = N
     }
 
 @router.get("/{learner_id}/roadmap", response_model=RoadmapResponse)
-def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
+def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     roadmap = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
         Roadmap.status.in_(["active", "completed"])
@@ -191,7 +193,7 @@ def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
     return RoadmapResponse.model_validate(loaded_roadmap)
 
 @router.post("/{learner_id}/roadmap/milestones/{milestone_id}/start")
-def start_milestone_endpoint(learner_id: int, milestone_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
+def start_milestone_endpoint(learner_id: int, milestone_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     roadmap = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
         Roadmap.status.in_(["active", "completed"])
@@ -236,7 +238,7 @@ def start_milestone_endpoint(learner_id: int, milestone_id: int, payload: Option
     }
 
 @router.post("/{learner_id}/roadmap/items/{item_id}/complete")
-def complete_item_endpoint(learner_id: int, item_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
+def complete_item_endpoint(learner_id: int, item_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     roadmap = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
         Roadmap.status.in_(["active", "completed"])

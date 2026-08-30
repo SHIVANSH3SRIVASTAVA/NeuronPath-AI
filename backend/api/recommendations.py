@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from typing import Optional
 from database import get_db
 from models.learner import Learner
+from core.deps import verify_learner_access
 from models.roadmap import LearnerGoal, GoalSkillRequirement
 from models.skill import Skill, LearnerSkill, SkillPrerequisite
 from models.resource import Resource
@@ -12,7 +14,7 @@ from recommendation.engine import rank_resources
 router = APIRouter()
 
 @router.get("")
-def get_recommendations(learner_id: int, db: Session = Depends(get_db)):
+def get_recommendations(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     learner = db.query(Learner).filter(Learner.id == learner_id).first()
     goal = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id, LearnerGoal.status == "active").first()
     if not goal:

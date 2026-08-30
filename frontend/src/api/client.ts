@@ -25,9 +25,34 @@ export const apiClient = axios.create({
   timeout: 90000,
 });
 
+apiClient.interceptors.request.use((config) => {
+  try {
+    let token = localStorage.getItem('neuronpath-token');
+    if (!token) {
+      const stored = localStorage.getItem('neuronpath-storage');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        token = parsed?.state?.token;
+      }
+    }
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (e) {}
+  return config;
+});
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/') {
+        try {
+          localStorage.removeItem('neuronpath-token');
+        } catch (e) {}
+      }
+    }
     console.error('API Request Error:', {
       url: error.config?.url,
       method: error.config?.method,

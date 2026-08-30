@@ -31,7 +31,12 @@ export default function Landing() {
             )}
           </button>
 
-          <Button onClick={() => navigate('/onboarding')}>Get Started</Button>
+          <Button variant="outline" onClick={() => navigate('/login')}>
+            Sign In
+          </Button>
+          <Button onClick={() => navigate('/register')}>
+            Get Started
+          </Button>
         </div>
       </header>
       
@@ -44,8 +49,11 @@ export default function Landing() {
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Button size="lg" onClick={() => navigate('/onboarding')} className="text-base px-8 font-semibold shadow-md inline-flex items-center gap-2">
+          <Button size="lg" onClick={() => navigate('/register')} className="text-base px-8 font-semibold shadow-md inline-flex items-center gap-2">
             Start Your Learning Journey <ArrowRight className="w-4 h-4" />
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => navigate('/login')} className="text-base px-6 font-semibold">
+            Sign In to Account
           </Button>
         </div>
 
