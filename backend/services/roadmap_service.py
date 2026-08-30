@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload, joinedload
 from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem, LearnerGoal, GoalSkillRequirement
 from models.skill import LearnerSkill, SkillPrerequisite, Skill
 from models.resource import Resource
@@ -185,6 +185,8 @@ def generate_roadmap(db: Session, learner_id: int):
         old_r.status = "superseded"
         
     roadmap = Roadmap(learner_id=learner_id, goal_id=goal.id)
+    db.add(roadmap)
+    db.flush()
     
     resources = db.query(Resource).all()
     all_skills_objs = {s.id: s for s in db.query(Skill).all()}
@@ -195,8 +197,11 @@ def generate_roadmap(db: Session, learner_id: int):
     
     milestone_index = 0
     assigned_resource_ids_in_roadmap = set()
-    # Fine-grained dynamic milestone decomposition: 1 coherent skill per milestone (or 2 if >18 skills)
     chunk_size = 1 if len(order) <= 18 else 2
+    
+    milestone_objs = []
+    milestone_resources = []
+    
     for i in range(0, len(order), chunk_size):
         chunk = order[i:i+chunk_size]
         if not chunk:
@@ -217,17 +222,6 @@ def generate_roadmap(db: Session, learner_id: int):
             title = f"{skill_names[0]} & More"
             objective = f"Master {', '.join(skill_names)} for {goal.target_role}"
             
-        milestone = RoadmapMilestone(
-            order_index=milestone_index,
-            title=title,
-            objective=objective,
-            status="available" if milestone_index == 0 else "locked",
-            estimated_hours=8.0,
-            skill_ids=chunk,
-            completion_criteria=f"Complete {title} learning modules and pass the milestone assessment"
-        )
-        
-        # Filter strictly for resources relevant to THIS milestone's skill(s)
         direct_matches = []
         for r_tuple in ranked:
             res = r_tuple[0]
@@ -255,34 +249,47 @@ def generate_roadmap(db: Session, learner_id: int):
                     break
         
         assigned_resource_ids_in_roadmap.update(r.id for r in top_resources)
+        estimated_hours = max(float(sum(r.duration_hours or 0 for r in top_resources)), 6.0)
         
-        # Populate milestone items
-        estimated_hours = 0
+        m_obj = RoadmapMilestone(
+            roadmap_id=roadmap.id,
+            order_index=milestone_index,
+            title=title,
+            objective=objective,
+            status="available" if milestone_index == 0 else "locked",
+            estimated_hours=estimated_hours,
+            skill_ids=chunk,
+            completion_criteria=f"Complete {title} learning modules and pass the milestone assessment"
+        )
+        milestone_objs.append(m_obj)
+        milestone_resources.append(top_resources)
+        milestone_index += 1
+        
+    db.add_all(milestone_objs)
+    db.flush()
+    
+    item_objs = []
+    for m_obj, top_resources in zip(milestone_objs, milestone_resources):
         for res in top_resources:
-            item = MilestoneItem(
+            item_objs.append(MilestoneItem(
+                milestone_id=m_obj.id,
                 resource_id=res.id,
                 item_type="resource",
                 status="not_started"
-            )
-            estimated_hours += res.duration_hours or 0
-            milestone.items.append(item)
-            
-        milestone.estimated_hours = max(float(estimated_hours), 6.0)
-        
-        # Add milestone assessment task
-        assessment_item = MilestoneItem(
+            ))
+        item_objs.append(MilestoneItem(
+            milestone_id=m_obj.id,
             item_type="assessment",
             status="not_started"
-        )
-        milestone.items.append(assessment_item)
+        ))
         
-        roadmap.milestones.append(milestone)
-        milestone_index += 1
-        
-    db.add(roadmap)
+    db.add_all(item_objs)
     db.commit()
-    db.refresh(roadmap)
-    return roadmap
+    
+    return db.query(Roadmap).options(
+        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource),
+        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.project)
+    ).filter(Roadmap.id == roadmap.id).first()
 
 def get_next_action(db: Session, learner_id: int):
     roadmap = db.query(Roadmap).filter(

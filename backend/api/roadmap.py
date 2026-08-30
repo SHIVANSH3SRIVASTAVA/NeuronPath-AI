@@ -18,6 +18,8 @@ def create_roadmap(learner_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Could not generate roadmap")
     return roadmap
 
+from sqlalchemy.orm import selectinload, joinedload
+
 @router.get("", response_model=RoadmapResponse)
 def get_roadmap(learner_id: int, db: Session = Depends(get_db)):
     roadmap = db.query(Roadmap).filter(
@@ -31,11 +33,10 @@ def get_roadmap(learner_id: int, db: Session = Depends(get_db)):
     # Auto-recalculate statuses to maintain consistent locking/completion
     recalculate_roadmap_milestone_statuses(db, roadmap.id)
     
-    milestones = db.query(RoadmapMilestone).filter(
-        RoadmapMilestone.roadmap_id == roadmap.id
-    ).order_by(RoadmapMilestone.order_index).all()
-    roadmap.milestones = milestones
-    return roadmap
+    return db.query(Roadmap).options(
+        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource),
+        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.project)
+    ).filter(Roadmap.id == roadmap.id).first()
 
 @router.post("/milestones/{milestone_id}/start")
 def start_milestone_endpoint(learner_id: int, milestone_id: int, db: Session = Depends(get_db)):
