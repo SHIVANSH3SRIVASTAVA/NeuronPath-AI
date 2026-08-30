@@ -6,22 +6,42 @@ from api import routers
 from seed import seed_database
 from database import SessionLocal
 from contextlib import asynccontextmanager
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 
 def run_migrations():
-    """Ensure newly added columns exist in database tables."""
+    """Ensure newly added columns exist in database tables across PostgreSQL and SQLite."""
     Base.metadata.create_all(bind=engine)
-    with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE learning_activities ADD COLUMN description TEXT"))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text("ALTER TABLE learners ADD COLUMN hashed_password TEXT"))
-            conn.commit()
-        except Exception:
-            pass
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        
+        # 1. Learners table migration
+        if "learners" in tables:
+            cols = [c["name"] for c in inspector.get_columns("learners")]
+            if "hashed_password" not in cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE learners ADD COLUMN hashed_password VARCHAR"))
+                except Exception as e:
+                    print(f"Migration error learners.hashed_password: {e}")
+            if "email" not in cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE learners ADD COLUMN email VARCHAR"))
+                except Exception as e:
+                    print(f"Migration error learners.email: {e}")
+                    
+        # 2. Learning activities table migration
+        if "learning_activities" in tables:
+            act_cols = [c["name"] for c in inspector.get_columns("learning_activities")]
+            if "description" not in act_cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE learning_activities ADD COLUMN description TEXT"))
+                except Exception as e:
+                    print(f"Migration error learning_activities.description: {e}")
+    except Exception as e:
+        print(f"Migration inspect error: {e}")
 
 # Run migrations on module load to guarantee schema readiness
 run_migrations()

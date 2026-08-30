@@ -44,35 +44,63 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             detail="Invalid email address format. Please enter a valid email."
         )
     
-    existing = db.query(Learner).filter(Learner.email == clean_email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An account with this email address already exists. Please log in instead."
+    try:
+        existing = db.query(Learner).filter(Learner.email == clean_email).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this email address already exists. Please log in instead."
+            )
+            
+        hashed = hash_password(payload.password)
+        learner = Learner(
+            name=payload.name.strip(),
+            email=clean_email,
+            hashed_password=hashed,
+            experience_level="beginner",
+            weekly_hours=10.0,
+            learning_style="visual_and_interactive",
+            preferred_formats=["course", "practice", "documentation"]
         )
+        db.add(learner)
+        db.commit()
+        db.refresh(learner)
         
-    hashed = hash_password(payload.password)
-    learner = Learner(
-        name=payload.name.strip(),
-        email=clean_email,
-        hashed_password=hashed,
-        experience_level="beginner",
-        weekly_hours=10.0,
-        learning_style="visual_and_interactive",
-        preferred_formats=["course", "practice", "documentation"]
-    )
-    db.add(learner)
-    db.commit()
-    db.refresh(learner)
-    
-    token = create_access_token(data={"sub": str(learner.id), "email": learner.email})
-    
-    return {
-        "status": "success",
-        "access_token": token,
-        "token_type": "bearer",
-        "learner": learner_to_dict(learner)
-    }
+        token = create_access_token(data={"sub": str(learner.id), "email": learner.email})
+        
+        return {
+            "status": "success",
+            "access_token": token,
+            "token_type": "bearer",
+            "learner": learner_to_dict(learner)
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        # Attempt schema recovery if column was missing
+        try:
+            from database import engine
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE learners ADD COLUMN hashed_password VARCHAR"))
+            db.add(learner)
+            db.commit()
+            db.refresh(learner)
+            token = create_access_token(data={"sub": str(learner.id), "email": learner.email})
+            return {
+                "status": "success",
+                "access_token": token,
+                "token_type": "bearer",
+                "learner": learner_to_dict(learner)
+            }
+        except Exception as retry_err:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Registration failed: {str(e)}"
+            )
 
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
