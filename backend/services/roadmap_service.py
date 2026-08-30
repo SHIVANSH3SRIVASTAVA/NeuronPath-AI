@@ -228,8 +228,7 @@ def generate_roadmap(db: Session, learner_id: int):
             completion_criteria=f"Complete {title} learning modules and pass the milestone assessment"
         )
         db.add(milestone)
-        db.commit()
-        db.refresh(milestone)
+        db.flush()
         
         # Rank resources using multi-factor recommendation engine
         ranked = rank_resources(resources, learner, gaps, graph, learner_skills)
