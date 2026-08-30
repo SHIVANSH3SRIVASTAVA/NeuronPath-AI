@@ -125,4 +125,14 @@ def get_current_profile(current_learner: Learner = Depends(get_current_learner))
     """Return the profile of the currently authenticated learner."""
     return learner_to_dict(current_learner)
 
+@router.delete("/me")
+def delete_my_account(
+    current_learner: Learner = Depends(get_current_learner),
+    db: Session = Depends(get_db)
+):
+    """Delete the authenticated learner's account and all associated data."""
+    from .learners import delete_learner_account
+    return delete_learner_account(current_learner.id, db, _access=current_learner)
+
+
 

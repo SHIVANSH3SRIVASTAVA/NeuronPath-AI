@@ -44,7 +44,16 @@ export const getNextAction = async (id: number) => {
 };
 
 export const deleteLearner = async (id: number): Promise<{ status: string; message: string }> => {
-  const { data } = await apiClient.delete<{ status: string; message: string }>(`/learners/${id}`);
-  return data;
+  try {
+    const { data } = await apiClient.delete<{ status: string; message: string }>(`/learners/${id}`);
+    return data;
+  } catch (err: any) {
+    if (err.response?.status === 405 || err.response?.status === 404) {
+      const { data } = await apiClient.delete<{ status: string; message: string }>('/auth/me');
+      return data;
+    }
+    throw err;
+  }
 };
+
 
