@@ -43,7 +43,7 @@ export default function Register() {
     try {
       const res = await registerLearner({
         name: name.trim(),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password
       });
       setAuth(res.access_token, res.learner);

@@ -32,7 +32,7 @@ export default function Login() {
     setError(null);
 
     try {
-      const res = await loginLearner({ email: email.trim(), password });
+      const res = await loginLearner({ email: email.trim().toLowerCase(), password });
       setAuth(res.access_token, res.learner);
       navigate(from, { replace: true });
     } catch (err: any) {
