@@ -109,7 +109,11 @@ export default function GoalSelector() {
       });
       
       const updatedGoals = await getLearnerGoals(currentLearner.id);
-      setGoals(updatedGoals);
+      if (updatedGoals && updatedGoals.length > 0) {
+        setGoals(updatedGoals);
+      } else {
+        setGoals([...goals.map(g => ({ ...g, status: 'inactive' })), created]);
+      }
       setActiveGoal(created);
       triggerGoalUpdate();
       

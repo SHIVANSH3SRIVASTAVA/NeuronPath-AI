@@ -201,14 +201,18 @@ def set_or_update_goal(learner_id: int, req: CustomGoalUpdateRequest, db: Sessio
                 )
                 db.add(ls)
                 existing_ls_ids.add(sk_id)
-    db.commit()
+    # Automatically generate corresponding roadmap for this new goal
+    generate_roadmap(db, learner_id, goal_id=goal.id)
     
     return {
         "status": "success",
+        "id": goal.id,
         "goal_id": goal.id,
+        "learner_id": learner_id,
         "title": goal.title,
         "target_role": goal.target_role,
-        "timeline_months": goal.timeline_months
+        "timeline_months": goal.timeline_months,
+        "goal_status": goal.status
     }
 
 @router.get("/{learner_id}/goals", response_model=List[GoalResponse])
