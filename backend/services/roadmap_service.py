@@ -1,3 +1,4 @@
+from sqlalchemy import insert
 from sqlalchemy.orm import Session, selectinload, joinedload
 from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem, LearnerGoal, GoalSkillRequirement
 from models.skill import LearnerSkill, SkillPrerequisite, Skill
@@ -199,8 +200,8 @@ def generate_roadmap(db: Session, learner_id: int):
     assigned_resource_ids_in_roadmap = set()
     chunk_size = 1 if len(order) <= 18 else 2
     
-    milestone_objs = []
-    milestone_resources = []
+    milestone_dicts = []
+    milestone_meta = []
     
     for i in range(0, len(order), chunk_size):
         chunk = order[i:i+chunk_size]
@@ -251,92 +252,122 @@ def generate_roadmap(db: Session, learner_id: int):
         assigned_resource_ids_in_roadmap.update(r.id for r in top_resources)
         estimated_hours = max(float(sum(r.duration_hours or 0 for r in top_resources)), 6.0)
         
-        m_obj = RoadmapMilestone(
-            roadmap_id=roadmap.id,
-            order_index=milestone_index,
-            title=title,
-            objective=objective,
-            status="available" if milestone_index == 0 else "locked",
-            estimated_hours=estimated_hours,
-            skill_ids=chunk,
-            completion_criteria=f"Complete {title} learning modules and pass the milestone assessment"
-        )
-        milestone_objs.append(m_obj)
-        milestone_resources.append(top_resources)
+        m_dict = {
+            "roadmap_id": roadmap.id,
+            "order_index": milestone_index,
+            "title": title,
+            "objective": objective,
+            "status": "available" if milestone_index == 0 else "locked",
+            "estimated_hours": estimated_hours,
+            "skill_ids": chunk,
+            "completion_criteria": f"Complete {title} learning modules and pass the milestone assessment"
+        }
+        milestone_dicts.append(m_dict)
+        milestone_meta.append((milestone_index, title, objective, m_dict["status"], estimated_hours, chunk, m_dict["completion_criteria"], top_resources))
         milestone_index += 1
         
-    db.add_all(milestone_objs)
-    db.flush()
-    
-    item_objs = []
-    for m_obj, top_resources in zip(milestone_objs, milestone_resources):
-        m_items = []
-        for res in top_resources:
-            it = MilestoneItem(
-                milestone_id=m_obj.id,
-                resource_id=res.id,
-                item_type="resource",
-                status="not_started"
-            )
-            it.resource = res
-            item_objs.append(it)
-            m_items.append(it)
-            
-        it_assess = MilestoneItem(
-            milestone_id=m_obj.id,
-            item_type="assessment",
-            status="not_started"
-        )
-        item_objs.append(it_assess)
-        m_items.append(it_assess)
-        m_obj.items = m_items
+    if not milestone_dicts:
+        db.commit()
+        return {"id": roadmap.id, "learner_id": learner_id, "goal_id": goal.id, "status": "active", "milestones": []}
         
-    db.add_all(item_objs)
+    # Multi-row bulk insert for milestones
+    try:
+        m_stmt = insert(RoadmapMilestone).values(milestone_dicts).returning(RoadmapMilestone.id, RoadmapMilestone.order_index)
+        m_rows = db.execute(m_stmt).fetchall()
+        m_id_map = {row[1]: row[0] for row in m_rows}
+    except Exception:
+        db.rollback()
+        db.add(roadmap)
+        db.flush()
+        for md in milestone_dicts:
+            md["roadmap_id"] = roadmap.id
+        db.execute(insert(RoadmapMilestone).values(milestone_dicts))
+        db.flush()
+        created_ms = db.query(RoadmapMilestone).filter(RoadmapMilestone.roadmap_id == roadmap.id).all()
+        m_id_map = {m.order_index: m.id for m in created_ms}
+        
+    # Multi-row bulk insert for milestone items
+    item_dicts = []
+    for m_idx, _, _, _, _, _, _, top_res in milestone_meta:
+        m_id = m_id_map.get(m_idx)
+        if not m_id:
+            continue
+        for res in top_res:
+            item_dicts.append({
+                "milestone_id": m_id,
+                "resource_id": res.id,
+                "project_id": None,
+                "item_type": "resource",
+                "status": "not_started"
+            })
+        item_dicts.append({
+            "milestone_id": m_id,
+            "resource_id": None,
+            "project_id": None,
+            "item_type": "assessment",
+            "status": "not_started"
+        })
+        
+    if item_dicts:
+        db.execute(insert(MilestoneItem).values(item_dicts))
+        
     db.commit()
     
+    # Construct response dictionary instantly in memory
+    response_milestones = []
+    for m_idx, m_title, m_obj, m_stat, m_hours, m_skills, m_crit, top_res in milestone_meta:
+        m_id = m_id_map.get(m_idx, 0)
+        items_resp = []
+        for res in top_res:
+            items_resp.append({
+                "id": 0,
+                "milestone_id": m_id,
+                "item_type": "resource",
+                "status": "not_started",
+                "resource": {
+                    "id": res.id,
+                    "title": res.title,
+                    "type": res.type,
+                    "provider": res.provider,
+                    "url": res.url,
+                    "difficulty": res.difficulty,
+                    "duration_hours": float(res.duration_hours or 0.0),
+                    "quality_score": float(res.quality_score or 50.0),
+                    "description": res.description or "",
+                    "skill_ids": res.skill_ids or [],
+                    "prerequisite_skill_ids": res.prerequisite_skill_ids or []
+                },
+                "project": None,
+                "completed_at": None
+            })
+        items_resp.append({
+            "id": 0,
+            "milestone_id": m_id,
+            "item_type": "assessment",
+            "status": "not_started",
+            "resource": None,
+            "project": None,
+            "completed_at": None
+        })
+        response_milestones.append({
+            "id": m_id,
+            "roadmap_id": roadmap.id,
+            "order_index": m_idx,
+            "title": m_title,
+            "objective": m_obj or "",
+            "status": m_stat,
+            "estimated_hours": float(m_hours or 8.0),
+            "skill_ids": m_skills or [],
+            "completion_criteria": m_crit or "",
+            "items": items_resp
+        })
+        
     return {
         "id": roadmap.id,
         "learner_id": learner_id,
         "goal_id": goal.id,
         "status": "active",
-        "milestones": [
-            {
-                "id": m.id,
-                "roadmap_id": roadmap.id,
-                "order_index": m.order_index,
-                "title": m.title,
-                "objective": m.objective or "",
-                "status": m.status,
-                "estimated_hours": float(m.estimated_hours or 8.0),
-                "skill_ids": m.skill_ids or [],
-                "completion_criteria": m.completion_criteria or "",
-                "items": [
-                    {
-                        "id": it.id,
-                        "milestone_id": m.id,
-                        "item_type": it.item_type,
-                        "status": it.status,
-                        "resource": {
-                            "id": it.resource.id,
-                            "title": it.resource.title,
-                            "type": it.resource.type,
-                            "provider": it.resource.provider,
-                            "url": it.resource.url,
-                            "difficulty": it.resource.difficulty,
-                            "duration_hours": float(it.resource.duration_hours or 0.0),
-                            "quality_score": float(it.resource.quality_score or 50.0),
-                            "description": it.resource.description or "",
-                            "skill_ids": it.resource.skill_ids or [],
-                            "prerequisite_skill_ids": it.resource.prerequisite_skill_ids or []
-                        } if it.resource else None,
-                        "project": None,
-                        "completed_at": None
-                    }
-                    for it in (m.items if hasattr(m, "items") else [])
-                ]
-            }
-            for m in milestone_objs
-        ]
+        "milestones": response_milestones
     }
 
 def get_next_action(db: Session, learner_id: int):
