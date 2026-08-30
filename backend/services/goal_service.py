@@ -147,6 +147,7 @@ def create_goal(db: Session, learner_id: int, title: str, target_role: str, time
     
     all_skills = db.query(Skill).all()
     skills_map = {s.name: s for s in all_skills}
+    existing_ls_ids = {ls.skill_id for ls in db.query(LearnerSkill).filter(LearnerSkill.learner_id == learner_id).all()}
     
     requirements = derive_skill_requirements(target_role, title, all_skills)
     
@@ -162,11 +163,7 @@ def create_goal(db: Session, learner_id: int, title: str, target_role: str, time
             db.add(req)
             
             # Ensure LearnerSkill exists for this learner so skill proficiency metrics are always trackable
-            existing_ls = db.query(LearnerSkill).filter(
-                LearnerSkill.learner_id == learner_id,
-                LearnerSkill.skill_id == skill_obj.id
-            ).first()
-            if not existing_ls:
+            if skill_obj.id not in existing_ls_ids:
                 ls = LearnerSkill(
                     learner_id=learner_id,
                     skill_id=skill_obj.id,
@@ -174,6 +171,7 @@ def create_goal(db: Session, learner_id: int, title: str, target_role: str, time
                     system_confidence=0.0
                 )
                 db.add(ls)
+                existing_ls_ids.add(skill_obj.id)
             
     db.commit()
     return goal

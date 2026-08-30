@@ -73,20 +73,19 @@ async def onboard_learner(learner_id: int, req: OnboardingRequest, db: Session =
     known_skills = goal_data.get("known_skills", [])
     if known_skills:
         skill_map = {s.name: s for s in db.query(Skill).all()}
+        existing_ls_ids = {ls.skill_id for ls in db.query(LearnerSkill).filter(LearnerSkill.learner_id == learner_id).all()}
         for skill_name in known_skills:
             if skill_name in skill_map:
-                existing_ls = db.query(LearnerSkill).filter(
-                    LearnerSkill.learner_id == learner_id,
-                    LearnerSkill.skill_id == skill_map[skill_name].id
-                ).first()
-                if not existing_ls:
+                sk_id = skill_map[skill_name].id
+                if sk_id not in existing_ls_ids:
                     ls = LearnerSkill(
                         learner_id=learner_id,
-                        skill_id=skill_map[skill_name].id,
+                        skill_id=sk_id,
                         self_reported_level=75.0,
                         system_confidence=calculate_system_confidence(75.0, None)
                     )
                     db.add(ls)
+                    existing_ls_ids.add(sk_id)
         db.commit()
         
     return OnboardingResponse(
@@ -119,20 +118,19 @@ def set_or_update_goal(learner_id: int, req: CustomGoalUpdateRequest, db: Sessio
     
     # Update known skills
     skill_map = {s.name: s for s in db.query(Skill).all()}
+    existing_ls_ids = {ls.skill_id for ls in db.query(LearnerSkill).filter(LearnerSkill.learner_id == learner_id).all()}
     for skill_name in req.known_skills:
         if skill_name in skill_map:
-            existing_ls = db.query(LearnerSkill).filter(
-                LearnerSkill.learner_id == learner_id,
-                LearnerSkill.skill_id == skill_map[skill_name].id
-            ).first()
-            if not existing_ls:
+            sk_id = skill_map[skill_name].id
+            if sk_id not in existing_ls_ids:
                 ls = LearnerSkill(
                     learner_id=learner_id,
-                    skill_id=skill_map[skill_name].id,
+                    skill_id=sk_id,
                     self_reported_level=75.0,
                     system_confidence=calculate_system_confidence(75.0, None)
                 )
                 db.add(ls)
+                existing_ls_ids.add(sk_id)
     db.commit()
     
     return {

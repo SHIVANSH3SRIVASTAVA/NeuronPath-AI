@@ -183,12 +183,8 @@ def generate_roadmap(db: Session, learner_id: int):
     ).all()
     for old_r in old_roadmaps:
         old_r.status = "superseded"
-    db.commit()
         
     roadmap = Roadmap(learner_id=learner_id, goal_id=goal.id)
-    db.add(roadmap)
-    db.commit()
-    db.refresh(roadmap)
     
     resources = db.query(Resource).all()
     all_skills_objs = {s.id: s for s in db.query(Skill).all()}
@@ -222,7 +218,6 @@ def generate_roadmap(db: Session, learner_id: int):
             objective = f"Master {', '.join(skill_names)} for {goal.target_role}"
             
         milestone = RoadmapMilestone(
-            roadmap_id=roadmap.id,
             order_index=milestone_index,
             title=title,
             objective=objective,
@@ -231,8 +226,6 @@ def generate_roadmap(db: Session, learner_id: int):
             skill_ids=chunk,
             completion_criteria=f"Complete {title} learning modules and pass the milestone assessment"
         )
-        db.add(milestone)
-        db.flush()
         
         # Filter strictly for resources relevant to THIS milestone's skill(s)
         direct_matches = []
@@ -267,27 +260,28 @@ def generate_roadmap(db: Session, learner_id: int):
         estimated_hours = 0
         for res in top_resources:
             item = MilestoneItem(
-                milestone_id=milestone.id,
                 resource_id=res.id,
                 item_type="resource",
                 status="not_started"
             )
             estimated_hours += res.duration_hours or 0
-            db.add(item)
+            milestone.items.append(item)
             
         milestone.estimated_hours = max(float(estimated_hours), 6.0)
         
         # Add milestone assessment task
         assessment_item = MilestoneItem(
-            milestone_id=milestone.id,
             item_type="assessment",
             status="not_started"
         )
-        db.add(assessment_item)
-            
+        milestone.items.append(assessment_item)
+        
+        roadmap.milestones.append(milestone)
         milestone_index += 1
         
+    db.add(roadmap)
     db.commit()
+    db.refresh(roadmap)
     return roadmap
 
 def get_next_action(db: Session, learner_id: int):
