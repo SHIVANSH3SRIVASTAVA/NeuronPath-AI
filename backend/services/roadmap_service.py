@@ -191,7 +191,11 @@ def generate_roadmap(db: Session, learner_id: int):
     db.refresh(roadmap)
     
     resources = db.query(Resource).all()
-    all_skills = {s.id: s.name for s in db.query(Skill).all()}
+    all_skills_objs = {s.id: s for s in db.query(Skill).all()}
+    all_skills = {s.id: s.name for s in all_skills_objs.values()}
+    
+    # Pre-rank resources once using multi-factor recommendation engine
+    ranked = rank_resources(resources, learner, gaps, graph, learner_skills)
     
     milestone_index = 0
     assigned_resource_ids_in_roadmap = set()
@@ -207,7 +211,7 @@ def generate_roadmap(db: Session, learner_id: int):
         # Format clean, goal-relevant milestone title & topic-specific objective
         if len(skill_names) == 1:
             title = f"{skill_names[0]}"
-            skill_obj = db.query(Skill).filter(Skill.id == chunk[0]).first()
+            skill_obj = all_skills_objs.get(chunk[0])
             topic_desc = skill_obj.description if (skill_obj and skill_obj.description) else f"core concepts and practical techniques of {skill_names[0]}"
             objective = f"Master {topic_desc} for {goal.target_role}"
         elif len(skill_names) == 2:
@@ -229,9 +233,6 @@ def generate_roadmap(db: Session, learner_id: int):
         )
         db.add(milestone)
         db.flush()
-        
-        # Rank resources using multi-factor recommendation engine
-        ranked = rank_resources(resources, learner, gaps, graph, learner_skills)
         
         # Filter strictly for resources relevant to THIS milestone's skill(s)
         direct_matches = []
