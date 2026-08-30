@@ -14,11 +14,13 @@ export default function Resources() {
   const [searchParams, setSearchParams] = useSearchParams();
   const skillParam = searchParams.get('skill');
   const skillIdParam = searchParams.get('skillId');
+  const resourceIdParam = searchParams.get('id') || searchParams.get('resourceId');
+  const searchParam = searchParams.get('search') || searchParams.get('q');
 
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParam || '');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
 
@@ -35,11 +37,25 @@ export default function Resources() {
       .finally(() => setLoading(false));
   }, [currentLearner]);
 
-  const clearSkillFilter = () => {
+  useEffect(() => {
+    const q = searchParams.get('search') || searchParams.get('q');
+    if (q) {
+      setSearchTerm(q);
+    }
+  }, [searchParams]);
+
+  const clearAllFilters = () => {
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('skill');
     newParams.delete('skillId');
+    newParams.delete('id');
+    newParams.delete('resourceId');
+    newParams.delete('search');
+    newParams.delete('q');
     setSearchParams(newParams);
+    setSearchTerm('');
+    setSelectedType('all');
+    setSelectedDifficulty('all');
   };
 
   const getIcon = (type: string) => {
@@ -69,10 +85,16 @@ export default function Resources() {
 
   const selectedSkillId = skillIdParam ? parseInt(skillIdParam, 10) : null;
   const selectedSkillName = skillParam ? skillParam.toLowerCase().trim() : '';
+  const selectedResourceId = resourceIdParam ? parseInt(resourceIdParam, 10) : null;
 
   const filteredRecs = recommendations.filter(item => {
     const res = item.resource || item;
     
+    // Exact ID match if specified
+    if (selectedResourceId && res.id === selectedResourceId) {
+      return true;
+    }
+
     // 1. Skill filter from query params
     let matchesSkill = true;
     if (selectedSkillId || selectedSkillName) {
@@ -117,8 +139,8 @@ export default function Resources() {
         </p>
       </div>
 
-      {/* Active Skill Filter Banner */}
-      {skillParam && (
+      {/* Active Filter Banner */}
+      {(skillParam || resourceIdParam || (searchParam && searchTerm)) && (
         <div className="bg-primary-50 dark:bg-primary-950/70 border border-primary-200 dark:border-primary-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 shrink-0">
@@ -126,10 +148,10 @@ export default function Resources() {
             </div>
             <div>
               <span className="text-xs font-bold text-primary-800 dark:text-primary-300 uppercase tracking-wider block">
-                Filtered for Skill
+                {skillParam ? 'Filtered for Skill' : 'Filtered for Resource'}
               </span>
               <p className="text-sm font-bold text-primary-950 dark:text-white">
-                {skillParam} <span className="text-xs font-medium text-primary-700 dark:text-primary-300">({filteredRecs.length} matching resources)</span>
+                {skillParam || searchParam || `Resource #${resourceIdParam}`} <span className="text-xs font-medium text-primary-700 dark:text-primary-300">({filteredRecs.length} matching {filteredRecs.length === 1 ? 'resource' : 'resources'})</span>
               </p>
             </div>
           </div>
@@ -137,7 +159,7 @@ export default function Resources() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={clearSkillFilter}
+            onClick={clearAllFilters}
             className="border-primary-300 dark:border-primary-700 text-primary-800 dark:text-primary-200 hover:bg-primary-100 dark:hover:bg-primary-900 shrink-0 font-semibold"
           >
             <X className="w-3.5 h-3.5 mr-1.5" /> Clear Filter / Show All
@@ -198,9 +220,9 @@ export default function Resources() {
               ? `We couldn't find resources matching "${skillParam}" with your current filters.`
               : 'Try adjusting your search query or format/difficulty filter settings.'}
           </p>
-          {skillParam && (
+          {(skillParam || resourceIdParam || searchParam) && (
             <div className="pt-2">
-              <Button onClick={clearSkillFilter} variant="outline" size="sm">
+              <Button onClick={clearAllFilters} variant="outline" size="sm">
                 View All Recommendations
               </Button>
             </div>

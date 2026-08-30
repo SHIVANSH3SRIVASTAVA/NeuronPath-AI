@@ -1,8 +1,9 @@
 import React from 'react';
-import { RoadmapMilestone } from '../../types';
+import { useNavigate } from 'react-router-dom';
+import { RoadmapMilestone, MilestoneItem } from '../../types';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { PlayCircle, CheckCircle2, Lock, Clock, Target, BookOpen } from 'lucide-react';
+import { PlayCircle, CheckCircle2, Lock, Clock, Target, BookOpen, ExternalLink, Award, Code } from 'lucide-react';
 
 interface MilestoneDetailProps {
   milestone: RoadmapMilestone;
@@ -17,10 +18,31 @@ export function MilestoneDetail({
   onCompleteItem,
   starting = false 
 }: MilestoneDetailProps) {
+  const navigate = useNavigate();
   const isAvailable = milestone.status === 'available';
   const isInProgress = milestone.status === 'in_progress';
   const isCompleted = milestone.status === 'completed';
   const isLocked = milestone.status === 'locked';
+
+  const handleTaskClick = (item: MilestoneItem, resourceTitle: string) => {
+    if (isLocked) return;
+
+    if (item.item_type === 'assessment') {
+      navigate('/assessment');
+      return;
+    }
+
+    const resourceId = item.resource_id || item.resource?.id;
+    if (resourceId && resourceTitle) {
+      navigate(`/resources?id=${resourceId}&search=${encodeURIComponent(resourceTitle)}`);
+    } else if (resourceId) {
+      navigate(`/resources?id=${resourceId}`);
+    } else if (resourceTitle) {
+      navigate(`/resources?search=${encodeURIComponent(resourceTitle)}`);
+    } else {
+      navigate('/resources');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -104,7 +126,9 @@ export function MilestoneDetail({
         <div className="space-y-2.5">
           {milestone.items?.map((item, idx) => {
             const isItemDone = item.status === 'completed';
-            const resourceTitle = item.resource?.title || `Learning Module ${idx + 1}`;
+            const resourceTitle = item.resource?.title || item.project?.title || (item.item_type === 'assessment' ? 'Milestone Assessment' : `Learning Module ${idx + 1}`);
+            const isAssessment = item.item_type === 'assessment';
+            const isProject = item.item_type === 'project';
             
             return (
               <div 
@@ -123,17 +147,43 @@ export function MilestoneDetail({
                       ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                       : isItemDone 
                       ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' 
+                      : isAssessment
+                      ? 'bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400'
+                      : isProject
+                      ? 'bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400'
                       : 'bg-primary-50 dark:bg-primary-950 text-primary-600 dark:text-primary-400'
                   }`}>
-                    {isLocked ? <Lock className="w-4 h-4" /> : isItemDone ? <CheckCircle2 className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+                    {isLocked ? (
+                      <Lock className="w-4 h-4" />
+                    ) : isItemDone ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : isAssessment ? (
+                      <Award className="w-4 h-4" />
+                    ) : isProject ? (
+                      <Code className="w-4 h-4" />
+                    ) : (
+                      <BookOpen className="w-4 h-4" />
+                    )}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
                       {item.item_type}
                     </span>
-                    <p className={`text-sm font-bold truncate ${isLocked ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
-                      {resourceTitle}
-                    </p>
+                    {isLocked ? (
+                      <p className="text-sm font-bold truncate text-slate-500 dark:text-slate-400">
+                        {resourceTitle}
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleTaskClick(item, resourceTitle)}
+                        className="group/title text-sm font-bold truncate text-left text-slate-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 focus:text-primary-600 dark:focus:text-primary-400 hover:underline focus:underline focus:outline-none transition-colors inline-flex items-center gap-1.5 max-w-full cursor-pointer"
+                        title={isAssessment ? 'Take Milestone Assessment' : `View "${resourceTitle}" in Resources`}
+                      >
+                        <span className="truncate">{resourceTitle}</span>
+                        <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 group-focus/title:opacity-100 transition-opacity text-primary-500 shrink-0" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
