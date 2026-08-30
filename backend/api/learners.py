@@ -154,7 +154,7 @@ def create_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
     roadmap = generate_roadmap(db, learner_id)
     if not roadmap:
         raise HTTPException(status_code=400, detail="Could not generate roadmap")
-    return get_learner_roadmap(learner_id, db)
+    return roadmap
 
 @router.get("/{learner_id}/roadmap", response_model=RoadmapResponse)
 def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
