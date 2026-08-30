@@ -1,5 +1,6 @@
 import json
 import logging
+import asyncio
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class LLMProvider:
             if json_mode:
                 full_prompt += "\n\nIMPORTANT: Return ONLY valid JSON. Do not include markdown code blocks."
                 
-            response = self.client.generate_content(full_prompt)
+            response = await asyncio.to_thread(self.client.generate_content, full_prompt)
             
             text = response.text
             if json_mode:
