@@ -89,4 +89,57 @@ def test_learner_ownership_protection():
     assert res.status_code == 403
     assert "Access forbidden" in res.json()["detail"]
 
+def test_delete_account_and_isolation():
+    # Cleanup any old test accounts
+    db = SessionLocal()
+    for em in ["delete_me@test.com", "keep_me@test.com"]:
+        old = db.query(Learner).filter(Learner.email == em).first()
+        if old:
+            db.delete(old)
+    db.commit()
+    db.close()
+
+    # 1. Register User A and User B
+    res_a = client.post("/api/auth/register", json={
+        "name": "User To Delete",
+        "email": "delete_me@test.com",
+        "password": "Password123!"
+    })
+    assert res_a.status_code == 201
+    user_a_id = res_a.json()["learner"]["id"]
+    token_a = res_a.json()["access_token"]
+
+    res_b = client.post("/api/auth/register", json={
+        "name": "User To Keep",
+        "email": "keep_me@test.com",
+        "password": "Password123!"
+    })
+    assert res_b.status_code == 201
+    user_b_id = res_b.json()["learner"]["id"]
+    token_b = res_b.json()["access_token"]
+
+    # 2. User B tries to delete User A -> 403 Forbidden
+    forbidden_del = client.delete(f"/api/learners/{user_a_id}", headers={"Authorization": f"Bearer {token_b}"})
+    assert forbidden_del.status_code == 403
+
+    # 3. User A deletes own account -> 200 OK
+    del_res = client.delete(f"/api/learners/{user_a_id}", headers={"Authorization": f"Bearer {token_a}"})
+    assert del_res.status_code == 200
+    assert del_res.json()["status"] == "success"
+
+    # 4. Verify User A no longer exists in database
+    db = SessionLocal()
+    assert db.query(Learner).filter(Learner.id == user_a_id).first() is None
+    # 5. Verify User B is completely untouched and intact
+    assert db.query(Learner).filter(Learner.id == user_b_id).first() is not None
+    db.close()
+
+    # 6. Trying to login with User A fails (401)
+    login_deleted = client.post("/api/auth/login", json={
+        "email": "delete_me@test.com",
+        "password": "Password123!"
+    })
+    assert login_deleted.status_code == 401
+
+
 

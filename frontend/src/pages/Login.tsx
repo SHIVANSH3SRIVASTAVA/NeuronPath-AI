@@ -5,7 +5,7 @@ import { loginLearner } from '../api/auth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
-import { Brain, Lock, Mail, ArrowRight, Sun, Moon, AlertCircle } from 'lucide-react';
+import { Brain, Lock, Mail, ArrowRight, Sun, Moon, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export default function Login() {
 
   const isDark = theme === 'dark';
   const from = (location.state as any)?.from?.pathname || '/dashboard';
+  const successMessage = (location.state as any)?.successMessage;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +73,13 @@ export default function Login() {
               Sign in to continue your personalized learning roadmap
             </p>
           </div>
+
+          {successMessage && !error && (
+            <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-emerald-700 dark:text-emerald-300 shadow-2xs">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{successMessage}</span>
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300 shadow-2xs">

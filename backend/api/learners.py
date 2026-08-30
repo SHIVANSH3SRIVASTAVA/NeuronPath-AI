@@ -49,6 +49,63 @@ def update_existing_learner(learner_id: int, learner: LearnerUpdate, db: Session
         raise HTTPException(status_code=404, detail="Learner not found")
     return db_learner
 
+@router.delete("/{learner_id}")
+def delete_learner_account(
+    learner_id: int, 
+    db: Session = Depends(get_db), 
+    _access: Optional[Learner] = Depends(verify_learner_access)
+):
+    """Securely delete a learner account and all associated data."""
+    learner = db.query(Learner).filter(Learner.id == learner_id).first()
+    if not learner:
+        raise HTTPException(status_code=404, detail="Learner not found")
+        
+    try:
+        from models.assessment import AssessmentAttempt, Assessment, AssessmentQuestion
+        from models.activity import ChatMessage, Recommendation
+        
+        # 1. Delete MilestoneItems and Milestones from Roadmaps
+        roadmaps = db.query(Roadmap).filter(Roadmap.learner_id == learner_id).all()
+        for rm in roadmaps:
+            milestones = db.query(RoadmapMilestone).filter(RoadmapMilestone.roadmap_id == rm.id).all()
+            for ms in milestones:
+                db.query(MilestoneItem).filter(MilestoneItem.milestone_id == ms.id).delete()
+            db.query(RoadmapMilestone).filter(RoadmapMilestone.roadmap_id == rm.id).delete()
+        db.query(Roadmap).filter(Roadmap.learner_id == learner_id).delete()
+        
+        # 2. Delete GoalSkillRequirements and Goals
+        goals = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id).all()
+        for g in goals:
+            db.query(GoalSkillRequirement).filter(GoalSkillRequirement.goal_id == g.id).delete()
+        db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id).delete()
+        
+        # 3. Delete LearnerSkills
+        db.query(LearnerSkill).filter(LearnerSkill.learner_id == learner_id).delete()
+        
+        # 4. Delete Assessments and AssessmentAttempts
+        db.query(AssessmentAttempt).filter(AssessmentAttempt.learner_id == learner_id).delete()
+        learner_assessments = db.query(Assessment).filter(Assessment.learner_id == learner_id).all()
+        for a in learner_assessments:
+            db.query(AssessmentQuestion).filter(AssessmentQuestion.assessment_id == a.id).delete()
+        db.query(Assessment).filter(Assessment.learner_id == learner_id).delete()
+        
+        # 5. Delete LearningActivities, Recommendations, and ChatMessages
+        db.query(LearningActivity).filter(LearningActivity.learner_id == learner_id).delete()
+        db.query(Recommendation).filter(Recommendation.learner_id == learner_id).delete()
+        db.query(ChatMessage).filter(ChatMessage.learner_id == learner_id).delete()
+        
+        # 6. Delete the Learner
+        db.delete(learner)
+        db.commit()
+        
+        return {"status": "success", "message": "Learner account and all associated data successfully deleted"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete account: {str(e)}"
+        )
+
 @router.post("/{learner_id}/onboard", response_model=OnboardingResponse)
 async def onboard_learner(learner_id: int, req: OnboardingRequest, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     db_learner = get_learner(db, learner_id)

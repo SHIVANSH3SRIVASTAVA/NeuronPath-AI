@@ -42,3 +42,9 @@ export const getNextAction = async (id: number) => {
     return data;
   }
 };
+
+export const deleteLearner = async (id: number): Promise<{ status: string; message: string }> => {
+  const { data } = await apiClient.delete<{ status: string; message: string }>(`/learners/${id}`);
+  return data;
+};
+

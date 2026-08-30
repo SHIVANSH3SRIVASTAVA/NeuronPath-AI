@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAppStore } from '../store/useAppStore';
-import { updateLearner } from '../api/learner';
-import { User, Save, CheckCircle2, AlertCircle } from 'lucide-react';
+import { updateLearner, deleteLearner } from '../api/learner';
+import { User, Save, CheckCircle2, AlertCircle, Trash2, AlertTriangle, X } from 'lucide-react';
 
 export default function Profile() {
-  const { currentLearner, setCurrentLearner } = useAppStore();
+  const navigate = useNavigate();
+  const { currentLearner, setCurrentLearner, logout } = useAppStore();
   const [name, setName] = useState(currentLearner?.name || '');
   const [hours, setHours] = useState(currentLearner?.weekly_hours || 10);
   const [experienceLevel, setExperienceLevel] = useState(currentLearner?.experience_level || 'beginner');
   const [learningStyle, setLearningStyle] = useState(currentLearner?.preferred_formats?.[0] || 'visual');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+
+  // Delete account modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   const handleSave = async () => {
     if (!currentLearner) return;
@@ -32,6 +39,26 @@ export default function Profile() {
       setMessage({ text: 'Failed to update profile.', type: 'error' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!currentLearner) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteLearner(currentLearner.id);
+      logout();
+      navigate('/login', { 
+        replace: true, 
+        state: { successMessage: 'Your account and all associated learning data have been permanently deleted.' } 
+      });
+    } catch (err: any) {
+      console.error('Delete account error:', err);
+      const detail = err.response?.data?.detail;
+      setDeleteError(typeof detail === 'string' ? detail : 'Failed to delete account. Please try again.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -103,6 +130,90 @@ export default function Profile() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-red-200 dark:border-red-950/70 bg-red-50/30 dark:bg-red-950/10">
+        <CardHeader className="border-b border-red-100 dark:border-red-950/50">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+            <AlertTriangle className="w-5 h-5" />
+            <h2 className="text-base font-bold">Danger Zone</h2>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Delete Account</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+              Permanently delete your account and all associated learning records, goals, personalized roadmaps, skill assessments, milestone progress, and chat history. This action cannot be undone.
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setDeleteError(null);
+              setShowDeleteModal(true);
+            }} 
+            className="border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 hover:border-red-400 font-semibold"
+          >
+            <Trash2 className="w-4 h-4 mr-1.5" />
+            Delete Account
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/60 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <button 
+                onClick={() => !deleting && setShowDeleteModal(false)}
+                disabled={deleting}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                Delete Account Permanently?
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                This action is <strong className="text-red-600 dark:text-red-400 font-semibold">irreversible</strong>. Your account, learning goals, customized roadmaps, skill assessments, milestone progress, and AI coach conversations will be immediately wiped.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-lg text-xs bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="flex-1 font-semibold"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold shadow-xs"
+              >
+                {deleting ? 'Deleting Account...' : 'Yes, Delete Account'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
