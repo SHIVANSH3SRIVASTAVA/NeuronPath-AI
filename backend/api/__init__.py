@@ -13,7 +13,6 @@ routers = [
     (goals_router, "/api/goals", ["goals"]),
     (skills_router, "/api/learners/{learner_id}/skills", ["skills"]),
     (recommendations_router, "/api/learners/{learner_id}/recommendations", ["recommendations"]),
-    (roadmap_router, "/api/learners/{learner_id}/roadmap", ["roadmap"]),
     (assessments_router, "/api/assessments", ["assessments"]),
     (progress_router, "/api/learners/{learner_id}/progress", ["progress"]),
     (coach_router, "/api/learners/{learner_id}/coach", ["coach"]),
