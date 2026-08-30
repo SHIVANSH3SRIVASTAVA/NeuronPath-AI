@@ -1,6 +1,8 @@
 import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field
 from typing import Optional
 from database import get_db
@@ -44,69 +46,56 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             detail="Invalid email address format. Please enter a valid email."
         )
     
-    try:
-        existing = db.query(Learner).filter(Learner.email == clean_email).first()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An account with this email address already exists. Please log in instead."
-            )
-            
-        hashed = hash_password(payload.password)
-        learner = Learner(
-            name=payload.name.strip(),
-            email=clean_email,
-            hashed_password=hashed,
-            experience_level="beginner",
-            weekly_hours=10.0,
-            learning_style="visual_and_interactive",
-            preferred_formats=["course", "practice", "documentation"]
+    # 1. Pre-check if email is already registered (case-insensitive)
+    existing = db.query(Learner).filter(func.lower(Learner.email) == clean_email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists. Please sign in instead."
         )
+        
+    hashed = hash_password(payload.password)
+    learner = Learner(
+        name=payload.name.strip(),
+        email=clean_email,
+        hashed_password=hashed,
+        experience_level="beginner",
+        weekly_hours=10.0,
+        learning_style="visual_and_interactive",
+        preferred_formats=["course", "practice", "documentation"]
+    )
+    
+    try:
         db.add(learner)
         db.commit()
         db.refresh(learner)
-        
-        token = create_access_token(data={"sub": str(learner.id), "email": learner.email})
-        
-        return {
-            "status": "success",
-            "access_token": token,
-            "token_type": "bearer",
-            "learner": learner_to_dict(learner)
-        }
-    except HTTPException:
+    except IntegrityError:
         db.rollback()
-        raise
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists. Please sign in instead."
+        )
     except Exception as e:
         db.rollback()
-        # Attempt schema recovery if column was missing
-        try:
-            from database import engine
-            from sqlalchemy import text
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE learners ADD COLUMN hashed_password VARCHAR"))
-            db.add(learner)
-            db.commit()
-            db.refresh(learner)
-            token = create_access_token(data={"sub": str(learner.id), "email": learner.email})
-            return {
-                "status": "success",
-                "access_token": token,
-                "token_type": "bearer",
-                "learner": learner_to_dict(learner)
-            }
-        except Exception as retry_err:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Registration failed: {str(e)}"
-            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Registration failed: {str(e)}"
+        )
+        
+    token = create_access_token(data={"sub": str(learner.id), "email": learner.email})
+    
+    return {
+        "status": "success",
+        "access_token": token,
+        "token_type": "bearer",
+        "learner": learner_to_dict(learner)
+    }
 
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate learner via email and password, returning a JWT access token."""
     clean_email = payload.email.strip().lower()
-    learner = db.query(Learner).filter(Learner.email == clean_email).first()
+    learner = db.query(Learner).filter(func.lower(Learner.email) == clean_email).first()
     
     if not learner or not learner.hashed_password:
         raise HTTPException(
@@ -135,4 +124,5 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 def get_current_profile(current_learner: Learner = Depends(get_current_learner)):
     """Return the profile of the currently authenticated learner."""
     return learner_to_dict(current_learner)
+
 

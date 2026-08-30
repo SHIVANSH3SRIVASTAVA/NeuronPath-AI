@@ -30,6 +30,12 @@ def run_migrations():
                         conn.execute(text("ALTER TABLE learners ADD COLUMN email VARCHAR"))
                 except Exception as e:
                     print(f"Migration error learners.email: {e}")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_learners_email ON learners(email)"))
+            except Exception:
+                pass
+
                     
         # 2. Learning activities table migration
         if "learning_activities" in tables:

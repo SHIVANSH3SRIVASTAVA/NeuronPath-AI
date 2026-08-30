@@ -33,11 +33,27 @@ def test_register_and_login_flow():
     user_id = data["learner"]["id"]
     token = data["access_token"]
 
-    # 2. Duplicate registration should fail
+    # 2. Duplicate registration with exact email should fail with 409 Conflict
     dup_res = client.post("/api/auth/register", json=reg_payload)
-    assert dup_res.status_code == 400
+    assert dup_res.status_code == 409
+    assert "already exists" in dup_res.json()["detail"]
 
-    # 3. Login with correct password
+    # 3. Duplicate registration with uppercase email variation should also fail with 409
+    dup_res_upper = client.post("/api/auth/register", json={
+        "name": "Alex Duplicate",
+        "email": email.upper(),
+        "password": "DifferentPassword456!"
+    })
+    assert dup_res_upper.status_code == 409
+    assert "already exists" in dup_res_upper.json()["detail"]
+
+    # Verify no duplicate user record was created in the DB
+    db = SessionLocal()
+    records = db.query(Learner).filter(Learner.email == email).all()
+    assert len(records) == 1
+    db.close()
+
+    # 4. Login with correct password
     login_res = client.post("/api/auth/login", json={
         "email": email,
         "password": "Password123!"
