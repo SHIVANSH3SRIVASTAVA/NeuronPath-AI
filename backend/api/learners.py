@@ -153,7 +153,7 @@ def learner_next_action(learner_id: int, db: Session = Depends(get_db)):
     return get_next_action(db, learner_id)
 
 @router.post("/{learner_id}/roadmap", response_model=RoadmapResponse)
-async def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
+def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
     generate_roadmap(db, learner_id)
     
     roadmap = db.query(Roadmap).options(
@@ -189,7 +189,7 @@ def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
     return RoadmapResponse.model_validate(loaded_roadmap)
 
 @router.post("/{learner_id}/roadmap/milestones/{milestone_id}/start")
-async def start_milestone_endpoint(learner_id: int, milestone_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
+def start_milestone_endpoint(learner_id: int, milestone_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
     roadmap = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
         Roadmap.status.in_(["active", "completed"])
@@ -225,7 +225,7 @@ async def start_milestone_endpoint(learner_id: int, milestone_id: int, payload: 
     }
 
 @router.post("/{learner_id}/roadmap/items/{item_id}/complete")
-async def complete_item_endpoint(learner_id: int, item_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
+def complete_item_endpoint(learner_id: int, item_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
     roadmap = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
         Roadmap.status.in_(["active", "completed"])
