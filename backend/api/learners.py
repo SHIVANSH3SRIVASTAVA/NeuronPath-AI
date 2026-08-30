@@ -4,7 +4,7 @@ from database import get_db
 from schemas.learner import LearnerCreate, LearnerResponse, LearnerUpdate, OnboardingRequest, OnboardingResponse
 from schemas.roadmap import GoalResponse, GoalRequest, RoadmapResponse
 from services.learner_service import create_learner, get_learner, update_learner
-from services.goal_service import create_goal
+from services.goal_service import create_goal, get_learner_goals, activate_goal, delete_goal
 from services.roadmap_service import generate_roadmap, recalculate_roadmap_milestone_statuses, get_next_action
 from ai.provider import LLMProvider
 from ai.onboarding import extract_goal_from_text
@@ -31,6 +31,12 @@ class CustomGoalUpdateRequest(BaseModel):
     known_skills: List[str] = []
     experience_level: Optional[str] = None
     weekly_hours: Optional[float] = None
+
+class GoalCreatePayload(BaseModel):
+    title: str
+    target_role: str
+    timeline_months: int = 6
+    set_active: bool = True
 
 @router.post("", response_model=LearnerResponse)
 def create_new_learner(learner: LearnerCreate, db: Session = Depends(get_db)):
@@ -205,6 +211,58 @@ def set_or_update_goal(learner_id: int, req: CustomGoalUpdateRequest, db: Sessio
         "timeline_months": goal.timeline_months
     }
 
+@router.get("/{learner_id}/goals", response_model=List[GoalResponse])
+def get_learner_goals_endpoint(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+    """List all goals for a learner."""
+    return get_learner_goals(db, learner_id)
+
+@router.post("/{learner_id}/goals", response_model=GoalResponse)
+def add_learner_goal_endpoint(learner_id: int, payload: GoalCreatePayload, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+    """Create a new goal for a learner and generate its roadmap."""
+    goal = create_goal(
+        db,
+        learner_id=learner_id,
+        title=payload.title,
+        target_role=payload.target_role,
+        timeline_months=payload.timeline_months,
+        set_active=payload.set_active
+    )
+    generate_roadmap(db, learner_id, goal_id=goal.id)
+    return goal
+
+@router.put("/{learner_id}/goals/{goal_id}/activate", response_model=GoalResponse)
+@router.post("/{learner_id}/goals/{goal_id}/activate", response_model=GoalResponse)
+def activate_learner_goal_endpoint(learner_id: int, goal_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+    """Switch active goal for a learner."""
+    goal = activate_goal(db, learner_id, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+        
+    rm = db.query(Roadmap).filter(
+        Roadmap.learner_id == learner_id,
+        Roadmap.goal_id == goal.id,
+        Roadmap.status.in_(["active", "completed"])
+    ).first()
+    if not rm:
+        generate_roadmap(db, learner_id, goal_id=goal.id)
+        
+    return goal
+
+@router.delete("/{learner_id}/goals/{goal_id}")
+def delete_learner_goal_endpoint(learner_id: int, goal_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+    """Safely delete a specific goal and its associated learning-path data."""
+    result = delete_goal(db, learner_id, goal_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Goal not found")
+        
+    return {
+        "status": "success",
+        "message": "Goal and its associated roadmap deleted successfully",
+        "deleted_goal_id": result["deleted_goal_id"],
+        "active_goal": result["active_goal"],
+        "remaining_goals": result["remaining_goals"]
+    }
+
 class ActionPayload(BaseModel):
     extra: Optional[dict] = None
 
@@ -226,17 +284,19 @@ def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = N
 
 @router.get("/{learner_id}/roadmap", response_model=RoadmapResponse)
 def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
-    roadmap = db.query(Roadmap).filter(
-        Roadmap.learner_id == learner_id, 
-        Roadmap.status.in_(["active", "completed"])
-    ).order_by(Roadmap.created_at.desc()).first()
+    active_goal = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id,
+        LearnerGoal.status == "active"
+    ).first()
     
-    if not roadmap:
-        generate_roadmap(db, learner_id)
-        roadmap = db.query(Roadmap).filter(
-            Roadmap.learner_id == learner_id, 
-            Roadmap.status.in_(["active", "completed"])
-        ).order_by(Roadmap.created_at.desc()).first()
+    roadmap_filter = [Roadmap.learner_id == learner_id, Roadmap.status.in_(["active", "completed"])]
+    if active_goal:
+        roadmap_filter.append(Roadmap.goal_id == active_goal.id)
+        
+    roadmap = db.query(Roadmap).filter(*roadmap_filter).order_by(Roadmap.created_at.desc()).first()
+    
+    if not roadmap and active_goal:
+        roadmap = generate_roadmap(db, learner_id, goal_id=active_goal.id)
         
     if not roadmap:
         raise HTTPException(status_code=404, detail="No active roadmap found")

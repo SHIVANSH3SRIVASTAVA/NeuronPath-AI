@@ -10,7 +10,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { BookOpen, Video, Code, ExternalLink, Sparkles, Search, Filter, X, Tag } from 'lucide-react';
 
 export default function Resources() {
-  const { currentLearner } = useAppStore();
+  const { currentLearner, activeGoalVersion, activeGoal } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const skillParam = searchParams.get('skill');
   const skillIdParam = searchParams.get('skillId');
@@ -35,7 +35,7 @@ export default function Resources() {
         setError('Failed to load personalized recommendations.');
       })
       .finally(() => setLoading(false));
-  }, [currentLearner]);
+  }, [currentLearner, activeGoalVersion, activeGoal?.id]);
 
   useEffect(() => {
     const q = searchParams.get('search') || searchParams.get('q');

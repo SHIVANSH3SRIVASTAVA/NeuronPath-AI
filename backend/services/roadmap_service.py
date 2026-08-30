@@ -151,16 +151,22 @@ def recalculate_roadmap_milestone_statuses(db: Session, roadmap_id: int):
 
     db.commit()
 
-def generate_roadmap(db: Session, learner_id: int):
+def generate_roadmap(db: Session, learner_id: int, goal_id: Optional[int] = None):
     """
     Dynamically decomposes the learner's goal into a fine-grained, coherent milestone graph.
     Each milestone attaches strictly relevant learning resources teaching its primary skill.
     """
     learner = db.query(Learner).filter(Learner.id == learner_id).first()
-    goal = db.query(LearnerGoal).filter(
-        LearnerGoal.learner_id == learner_id, 
-        LearnerGoal.status.in_(["active", "completed"])
-    ).first()
+    if goal_id:
+        goal = db.query(LearnerGoal).filter(
+            LearnerGoal.id == goal_id,
+            LearnerGoal.learner_id == learner_id
+        ).first()
+    else:
+        goal = db.query(LearnerGoal).filter(
+            LearnerGoal.learner_id == learner_id, 
+            LearnerGoal.status.in_(["active", "completed"])
+        ).first()
     
     if not goal:
         return None
@@ -180,6 +186,7 @@ def generate_roadmap(db: Session, learner_id: int):
     
     old_roadmaps = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
+        Roadmap.goal_id == goal.id,
         Roadmap.status.in_(["active", "completed"])
     ).all()
     for old_r in old_roadmaps:
@@ -218,102 +225,106 @@ def generate_roadmap(db: Session, learner_id: int):
             objective = f"Master {topic_desc} for {goal.target_role}"
         elif len(skill_names) == 2:
             title = f"{skill_names[0]} & {skill_names[1]}"
-            objective = f"Master {skill_names[0]} and {skill_names[1]} for {goal.target_role}"
+            objective = f"Master core competencies in {skill_names[0]} and {skill_names[1]} for {goal.target_role}"
         else:
-            title = f"{skill_names[0]} & More"
-            objective = f"Master {', '.join(skill_names)} for {goal.target_role}"
+            title = f"{skill_names[0]} & Related Skills"
+            objective = f"Build practical foundations across {', '.join(skill_names[:3])}"
             
-        direct_matches = []
-        for r_tuple in ranked:
-            res = r_tuple[0]
-            if is_resource_relevant_to_skill(res, chunk, skill_names, all_skills):
-                # Ensure primary skill match is ranked higher than general match
-                res_skill_set = set(res.skill_ids or [])
-                is_primary = bool(res_skill_set.intersection(set(chunk)))
-                direct_matches.append((res, 1 if is_primary else 0, r_tuple[1]))
+        # Target skill IDs & exact skill names for strict relevance filtering
+        target_skill_ids = chunk
+        target_skill_names = [all_skills.get(sid, "") for sid in chunk if sid in all_skills]
+        
+        # Strict Multi-factor Resource Relevance Filtering
+        matched_ranked = []
+        for r, score, breakdown in ranked:
+            if is_resource_relevant_to_skill(r, target_skill_ids, target_skill_names, all_skills_objs):
+                matched_ranked.append((r, score, breakdown))
                 
-        # Sort by primary match first, then recommendation score
-        direct_matches.sort(key=lambda x: (x[1], x[2]), reverse=True)
-        
-        # Prioritize unused resources in this roadmap to guarantee distinct learning tasks per milestone
-        unused_matches = [item[0] for item in direct_matches if item[0].id not in assigned_resource_ids_in_roadmap]
-        used_matches = [item[0] for item in direct_matches if item[0].id in assigned_resource_ids_in_roadmap]
-        top_resources = (unused_matches + used_matches)[:3]
-        
-        # Fallback ONLY to other resources in database that explicitly match the skill name
-        if not top_resources:
-            for res in resources:
-                if is_resource_relevant_to_skill(res, chunk, skill_names, all_skills):
-                    if res not in top_resources:
-                        top_resources.append(res)
-                if len(top_resources) >= 2:
+        # Pick top 2 distinct resources for this milestone
+        selected_resources = []
+        for r, score, breakdown in matched_ranked:
+            if r.id not in assigned_resource_ids_in_roadmap:
+                selected_resources.append(r)
+                assigned_resource_ids_in_roadmap.add(r.id)
+            if len(selected_resources) >= 2:
+                break
+                
+        # If needed, allow re-using highest relevance resource
+        if len(selected_resources) < 2 and matched_ranked:
+            for r, score, breakdown in matched_ranked:
+                if r not in selected_resources:
+                    selected_resources.append(r)
+                if len(selected_resources) >= 2:
                     break
+                    
+        est_hours = sum(r.duration_hours for r in selected_resources) if selected_resources else 15.0
         
-        assigned_resource_ids_in_roadmap.update(r.id for r in top_resources)
-        estimated_hours = max(float(sum(r.duration_hours or 0 for r in top_resources)), 6.0)
+        m_status = "available" if milestone_index == 0 else "locked"
         
-        m_obj = RoadmapMilestone(
+        milestone = RoadmapMilestone(
             roadmap_id=roadmap.id,
             order_index=milestone_index,
             title=title,
             objective=objective,
-            status="available" if milestone_index == 0 else "locked",
-            estimated_hours=estimated_hours,
+            status=m_status,
+            estimated_hours=float(est_hours),
             skill_ids=chunk,
-            completion_criteria=f"Complete {title} learning modules and pass the milestone assessment"
+            completion_criteria=f"Complete all recommended learning modules and pass the milestone verification assessment."
         )
-        milestone_objs.append(m_obj)
-        milestone_resources.append(top_resources)
+        milestone_objs.append(milestone)
+        milestone_resources.append(selected_resources)
         milestone_index += 1
         
     db.add_all(milestone_objs)
     db.flush()
     
     item_objs = []
-    for m_idx, (m_obj, top_resources) in enumerate(zip(milestone_objs, milestone_resources)):
-        if m_idx < 3 or m_obj.status in ["available", "in_progress"]:
-            for res in top_resources:
-                it = MilestoneItem(
-                    milestone_id=m_obj.id,
-                    resource_id=res.id,
-                    item_type="resource",
-                    status="not_started"
-                )
-                item_objs.append(it)
-                
-            it_assess = MilestoneItem(
-                milestone_id=m_obj.id,
-                item_type="assessment",
+    for m, res_list in zip(milestone_objs, milestone_resources):
+        # Add Resources
+        for r in res_list:
+            item_objs.append(MilestoneItem(
+                milestone_id=m.id,
+                resource_id=r.id,
+                item_type="resource",
                 status="not_started"
-            )
-            item_objs.append(it_assess)
+            ))
+        # Add Verification Assessment item
+        item_objs.append(MilestoneItem(
+            milestone_id=m.id,
+            resource_id=None,
+            item_type="assessment",
+            status="not_started"
+        ))
         
     db.add_all(item_objs)
     db.commit()
     return roadmap
 
 def get_next_action(db: Session, learner_id: int):
+    active_goal = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id, 
+        LearnerGoal.status.in_(["active", "completed"])
+    ).first()
+    
+    if not active_goal:
+        return {
+            "action": "create_goal", 
+            "title": "Set Your Goal",
+            "description": "Describe your target career role to generate your adaptive path.",
+            "message": "You need to set a goal first."
+        }
+        
     roadmap = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
+        Roadmap.goal_id == active_goal.id,
         Roadmap.status.in_(["active", "completed"])
     ).order_by(Roadmap.created_at.desc()).first()
     
     if not roadmap:
-        goal = db.query(LearnerGoal).filter(
-            LearnerGoal.learner_id == learner_id, 
-            LearnerGoal.status.in_(["active", "completed"])
-        ).first()
-        if not goal:
-            return {
-                "action": "create_goal", 
-                "title": "Set Your Goal",
-                "description": "Describe your target career role to generate your adaptive path.",
-                "message": "You need to set a goal first."
-            }
         return {
             "action": "create_goal", 
             "title": "Build Your Roadmap",
-            "description": "Ready to create your personalized step-by-step roadmap.",
+            "description": f"Ready to create your personalized step-by-step roadmap for {active_goal.title}.",
             "message": "Build your roadmap to start learning."
         }
         

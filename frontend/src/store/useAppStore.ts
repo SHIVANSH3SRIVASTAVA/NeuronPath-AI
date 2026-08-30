@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Learner } from '../types';
+import { Learner, LearnerGoal } from '../types';
 
 export const applyThemeToDom = (theme: 'light' | 'dark') => {
   if (typeof document !== 'undefined') {
@@ -41,6 +41,12 @@ interface AppState {
   isAuthenticated: boolean;
   setAuth: (token: string, learner: Learner) => void;
   setCurrentLearner: (learner: Learner | null) => void;
+  goals: LearnerGoal[];
+  activeGoal: LearnerGoal | null;
+  activeGoalVersion: number;
+  setGoals: (goals: LearnerGoal[]) => void;
+  setActiveGoal: (goal: LearnerGoal | null) => void;
+  triggerGoalUpdate: () => void;
   isOnboarded: boolean;
   setOnboarded: (status: boolean) => void;
   sidebarOpen: boolean;
@@ -61,6 +67,24 @@ export const useAppStore = create<AppState>()(
       token: null,
       currentLearner: null,
       isAuthenticated: false,
+      goals: [],
+      activeGoal: null,
+      activeGoalVersion: 0,
+      setGoals: (goals) => {
+        const active = goals.find(g => g.status === 'active') || (goals.length > 0 ? goals[0] : null);
+        set({ goals, activeGoal: active });
+      },
+      setActiveGoal: (goal) => {
+        set((state) => ({
+          activeGoal: goal,
+          goals: state.goals.map(g => ({
+            ...g,
+            status: (goal && g.id === goal.id) ? 'active' : 'inactive'
+          })),
+          activeGoalVersion: state.activeGoalVersion + 1
+        }));
+      },
+      triggerGoalUpdate: () => set((state) => ({ activeGoalVersion: state.activeGoalVersion + 1 })),
       setAuth: (token, learner) => {
         try {
           localStorage.setItem('neuronpath-token', token);
@@ -100,7 +124,10 @@ export const useAppStore = create<AppState>()(
           token: null, 
           currentLearner: null, 
           isAuthenticated: false, 
-          isOnboarded: false 
+          isOnboarded: false,
+          goals: [],
+          activeGoal: null,
+          activeGoalVersion: 0
         });
       },
     }),
@@ -112,6 +139,7 @@ export const useAppStore = create<AppState>()(
         isAuthenticated: state.isAuthenticated,
         isOnboarded: state.isOnboarded,
         theme: state.theme,
+        activeGoal: state.activeGoal,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

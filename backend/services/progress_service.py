@@ -11,13 +11,21 @@ def get_progress(db: Session, learner_id: int):
     """Calculate comprehensive progress data for a learner with semantic timeline growth."""
     learner = db.query(Learner).filter(Learner.id == learner_id).first()
 
-    # Find latest roadmap (active or completed)
+    # Find active goal
+    from models.roadmap import LearnerGoal, GoalSkillRequirement
+    active_goal = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id,
+        LearnerGoal.status == "active"
+    ).first()
+
+    # Find latest roadmap for active goal (active or completed)
+    roadmap_filter = [Roadmap.learner_id == learner_id, Roadmap.status.in_(["active", "completed"])]
+    if active_goal:
+        roadmap_filter.append(Roadmap.goal_id == active_goal.id)
+
     roadmap = db.query(Roadmap).options(
         selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource)
-    ).filter(
-        Roadmap.learner_id == learner_id, 
-        Roadmap.status.in_(["active", "completed"])
-    ).order_by(Roadmap.created_at.desc()).first()
+    ).filter(*roadmap_filter).order_by(Roadmap.created_at.desc()).first()
     
     milestones = []
     milestones_total = 0
@@ -32,8 +40,18 @@ def get_progress(db: Session, learner_id: int):
     if milestones_total > 0 and milestones_completed == milestones_total:
         overall_progress = 100.0
     
-    # Calculate skill distribution & categorized lists
-    skills = db.query(LearnerSkill).filter(LearnerSkill.learner_id == learner_id).all()
+    # Calculate skill distribution & categorized lists (scoped to active goal's requirements if present)
+    goal_skill_ids = None
+    if active_goal:
+        reqs = db.query(GoalSkillRequirement).filter(GoalSkillRequirement.goal_id == active_goal.id).all()
+        if reqs:
+            goal_skill_ids = {r.skill_id for r in reqs}
+
+    all_learner_skills = db.query(LearnerSkill).filter(LearnerSkill.learner_id == learner_id).all()
+    if goal_skill_ids:
+        skills = [s for s in all_learner_skills if s.skill_id in goal_skill_ids]
+    else:
+        skills = all_learner_skills
     all_skills_map = {s.skill_id: s for s in skills}
     
     categorized_skills = {

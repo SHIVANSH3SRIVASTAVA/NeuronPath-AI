@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
+import GoalSelector from '../goals/GoalSelector';
 import { 
   Bell, User, LogOut, Menu, 
   Sparkles, Map, Brain, CheckCheck, 
@@ -98,14 +99,17 @@ export default function TopBar() {
 
   return (
     <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 md:px-6 relative z-40 transition-colors">
-      <div className="flex items-center">
+      <div className="flex items-center gap-3">
         <button 
           onClick={toggleSidebar}
-          className="p-2 -ml-2 mr-2 md:hidden rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-300"
+          className="p-2 -ml-2 md:hidden rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-300"
           aria-label="Toggle Navigation"
         >
           <Menu className="w-5 h-5" />
         </button>
+
+        {/* Multi-Goal Switcher & Manager */}
+        <GoalSelector />
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">

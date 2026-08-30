@@ -11,7 +11,7 @@ import { Button } from '../components/ui/Button';
 import { Map, RefreshCw, AlertCircle } from 'lucide-react';
 
 export default function RoadmapPage() {
-  const { currentLearner } = useAppStore();
+  const { currentLearner, activeGoalVersion, activeGoal } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
@@ -36,7 +36,7 @@ export default function RoadmapPage() {
 
   useEffect(() => {
     fetchRoadmap();
-  }, [currentLearner]);
+  }, [currentLearner, activeGoalVersion, activeGoal?.id]);
 
   const handleRecalculate = async () => {
     if (!currentLearner) return;

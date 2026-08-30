@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Learner, NextAction, OnboardingResult } from '../types';
+import { Learner, LearnerGoal, GoalDeleteResult, NextAction, OnboardingResult } from '../types';
 
 export const createLearner = async (data: { name: string; experience_level?: string; weekly_hours?: number }) => {
   const { data: learner } = await apiClient.post<Learner>('/learners', data);
@@ -55,5 +55,49 @@ export const deleteLearner = async (id: number): Promise<{ status: string; messa
     throw err;
   }
 };
+
+export const getLearnerGoals = async (learnerId: number): Promise<LearnerGoal[]> => {
+  try {
+    const { data } = await apiClient.get<LearnerGoal[]>('/goals');
+    return data;
+  } catch {
+    const { data } = await apiClient.get<LearnerGoal[]>(`/learners/${learnerId}/goals`);
+    return data;
+  }
+};
+
+export const createLearnerGoal = async (
+  learnerId: number,
+  payload: { title: string; target_role: string; timeline_months: number; set_active?: boolean }
+): Promise<LearnerGoal> => {
+  try {
+    const { data } = await apiClient.post<LearnerGoal>('/goals', payload);
+    return data;
+  } catch {
+    const { data } = await apiClient.post<LearnerGoal>(`/learners/${learnerId}/goals`, payload);
+    return data;
+  }
+};
+
+export const activateLearnerGoal = async (learnerId: number, goalId: number): Promise<LearnerGoal> => {
+  try {
+    const { data } = await apiClient.put<LearnerGoal>(`/goals/${goalId}/activate`);
+    return data;
+  } catch {
+    const { data } = await apiClient.put<LearnerGoal>(`/learners/${learnerId}/goals/${goalId}/activate`);
+    return data;
+  }
+};
+
+export const deleteLearnerGoal = async (learnerId: number, goalId: number): Promise<GoalDeleteResult> => {
+  try {
+    const { data } = await apiClient.delete<GoalDeleteResult>(`/goals/${goalId}`);
+    return data;
+  } catch {
+    const { data } = await apiClient.delete<GoalDeleteResult>(`/learners/${learnerId}/goals/${goalId}`);
+    return data;
+  }
+};
+
 
 

@@ -16,7 +16,7 @@ import { Sparkles, Map, Target } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { currentLearner } = useAppStore();
+  const { currentLearner, activeGoalVersion, activeGoal } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -61,7 +61,7 @@ export default function Dashboard() {
     }).finally(() => {
       setLoading(false);
     });
-  }, [currentLearner]);
+  }, [currentLearner, activeGoalVersion, activeGoal?.id]);
 
   if (!currentLearner) {
     return (
