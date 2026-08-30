@@ -270,22 +270,23 @@ def generate_roadmap(db: Session, learner_id: int):
     db.flush()
     
     item_objs = []
-    for m_obj, top_resources in zip(milestone_objs, milestone_resources):
-        for res in top_resources:
-            it = MilestoneItem(
+    for m_idx, (m_obj, top_resources) in enumerate(zip(milestone_objs, milestone_resources)):
+        if m_idx < 3 or m_obj.status in ["available", "in_progress"]:
+            for res in top_resources:
+                it = MilestoneItem(
+                    milestone_id=m_obj.id,
+                    resource_id=res.id,
+                    item_type="resource",
+                    status="not_started"
+                )
+                item_objs.append(it)
+                
+            it_assess = MilestoneItem(
                 milestone_id=m_obj.id,
-                resource_id=res.id,
-                item_type="resource",
+                item_type="assessment",
                 status="not_started"
             )
-            item_objs.append(it)
-            
-        it_assess = MilestoneItem(
-            milestone_id=m_obj.id,
-            item_type="assessment",
-            status="not_started"
-        )
-        item_objs.append(it_assess)
+            item_objs.append(it_assess)
         
     db.add_all(item_objs)
     db.commit()

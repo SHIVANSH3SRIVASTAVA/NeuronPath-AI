@@ -205,6 +205,15 @@ def start_milestone_endpoint(learner_id: int, milestone_id: int, payload: Option
     if milestone.status == "available":
         milestone.status = "in_progress"
         items = db.query(MilestoneItem).filter(MilestoneItem.milestone_id == milestone.id).all()
+        if not items:
+            resources = db.query(Resource).all()
+            top_resources = [r for r in resources if any(s in (r.skill_ids or []) for s in (milestone.skill_ids or []))][:3]
+            for res in top_resources:
+                db.add(MilestoneItem(milestone_id=milestone.id, resource_id=res.id, item_type="resource", status="not_started"))
+            db.add(MilestoneItem(milestone_id=milestone.id, item_type="assessment", status="not_started"))
+            db.flush()
+            items = db.query(MilestoneItem).filter(MilestoneItem.milestone_id == milestone.id).all()
+            
         for it in items:
             if it.status == "not_started":
                 it.status = "in_progress"
