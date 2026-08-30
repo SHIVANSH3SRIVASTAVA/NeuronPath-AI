@@ -270,26 +270,32 @@ def generate_roadmap(db: Session, learner_id: int):
     
     item_objs = []
     for m_obj, top_resources in zip(milestone_objs, milestone_resources):
+        m_items = []
         for res in top_resources:
-            item_objs.append(MilestoneItem(
+            it = MilestoneItem(
                 milestone_id=m_obj.id,
                 resource_id=res.id,
                 item_type="resource",
                 status="not_started"
-            ))
-        item_objs.append(MilestoneItem(
+            )
+            it.resource = res
+            item_objs.append(it)
+            m_items.append(it)
+            
+        it_assess = MilestoneItem(
             milestone_id=m_obj.id,
             item_type="assessment",
             status="not_started"
-        ))
+        )
+        item_objs.append(it_assess)
+        m_items.append(it_assess)
+        m_obj.items = m_items
         
     db.add_all(item_objs)
     db.commit()
     
-    return db.query(Roadmap).options(
-        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource),
-        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.project)
-    ).filter(Roadmap.id == roadmap.id).first()
+    roadmap.milestones = milestone_objs
+    return roadmap
 
 def get_next_action(db: Session, learner_id: int):
     roadmap = db.query(Roadmap).filter(
