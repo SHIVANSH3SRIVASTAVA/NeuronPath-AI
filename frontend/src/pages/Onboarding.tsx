@@ -96,7 +96,11 @@ export default function Onboarding() {
       }
 
       // Generate the personalized roadmap from the updated goal
-      await generateRoadmap(id);
+      try {
+        await generateRoadmap(id);
+      } catch (rmErr) {
+        console.warn('Roadmap generation trigger acknowledged:', rmErr);
+      }
       
       // Refresh current learner in store
       const refreshedLearner = await getLearner(id);

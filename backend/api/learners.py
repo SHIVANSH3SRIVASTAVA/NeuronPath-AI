@@ -172,6 +172,13 @@ def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
     ).order_by(Roadmap.created_at.desc()).first()
     
     if not roadmap:
+        generate_roadmap(db, learner_id)
+        roadmap = db.query(Roadmap).filter(
+            Roadmap.learner_id == learner_id, 
+            Roadmap.status.in_(["active", "completed"])
+        ).order_by(Roadmap.created_at.desc()).first()
+        
+    if not roadmap:
         raise HTTPException(status_code=404, detail="No active roadmap found")
         
     recalculate_roadmap_milestone_statuses(db, roadmap.id)
