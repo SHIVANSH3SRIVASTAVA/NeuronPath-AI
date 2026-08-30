@@ -16,7 +16,3 @@ export const getMe = async (): Promise<Learner> => {
   return response.data;
 };
 
-export const loginDemoAccount = async (learnerId: number): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>('/auth/demo-login', { learner_id: learnerId });
-  return response.data;
-};

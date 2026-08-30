@@ -73,11 +73,4 @@ def test_learner_ownership_protection():
     assert res.status_code == 403
     assert "Access forbidden" in res.json()["detail"]
 
-def test_demo_login():
-    res = client.post("/api/auth/demo-login", json={"learner_id": 1})
-    assert res.status_code in [200, 404]
-    if res.status_code == 200:
-        data = res.json()
-        assert "access_token" in data
-        assert data["learner"]["id"] == 1
 

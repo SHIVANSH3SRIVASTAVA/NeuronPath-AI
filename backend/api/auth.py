@@ -21,9 +21,6 @@ class LoginRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=255)
     password: str = Field(..., min_length=1)
 
-class DemoLoginRequest(BaseModel):
-    learner_id: int
-
 def learner_to_dict(learner: Learner) -> dict:
     return {
         "id": learner.id,
@@ -111,21 +108,3 @@ def get_current_profile(current_learner: Learner = Depends(get_current_learner))
     """Return the profile of the currently authenticated learner."""
     return learner_to_dict(current_learner)
 
-@router.post("/demo-login")
-def demo_login(payload: DemoLoginRequest, db: Session = Depends(get_db)):
-    """Authenticate and issue a JWT token for preset demo learners."""
-    learner = db.query(Learner).filter(Learner.id == payload.learner_id).first()
-    if not learner:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Demo learner #{payload.learner_id} not found."
-        )
-        
-    token = create_access_token(data={"sub": str(learner.id), "email": learner.email or f"demo{learner.id}@neuronpath.dev"})
-    
-    return {
-        "status": "success",
-        "access_token": token,
-        "token_type": "bearer",
-        "learner": learner_to_dict(learner)
-    }

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
-import { loginLearner, loginDemoAccount } from '../api/auth';
+import { loginLearner } from '../api/auth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/Card';
-import { Brain, Lock, Mail, ArrowRight, Sparkles, Sun, Moon, AlertCircle } from 'lucide-react';
+import { Brain, Lock, Mail, ArrowRight, Sun, Moon, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,7 +15,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isDark = theme === 'dark';
@@ -41,21 +40,6 @@ export default function Login() {
       setError(typeof detail === 'string' ? detail : 'Invalid email or password. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async (learnerId: number) => {
-    setDemoLoading(learnerId);
-    setError(null);
-    try {
-      const res = await loginDemoAccount(learnerId);
-      setAuth(res.access_token, res.learner);
-      navigate('/dashboard', { replace: true });
-    } catch (err: any) {
-      console.error('Demo login error:', err);
-      setError('Failed to log in to demo profile. Please try regular login or signup.');
-    } finally {
-      setDemoLoading(null);
     }
   };
 
@@ -137,44 +121,12 @@ export default function Login() {
 
                 <Button
                   type="submit"
-                  disabled={loading || !!demoLoading}
+                  disabled={loading}
                   className="w-full font-bold shadow-sm mt-2 cursor-pointer"
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
                 </Button>
               </form>
-
-              <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800">
-                <div className="text-center mb-3">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Or explore demo profiles
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={loading || !!demoLoading}
-                    onClick={() => handleDemoLogin(1)}
-                    className="text-xs font-semibold truncate justify-center"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 mr-1 text-primary-500 shrink-0" />
-                    {demoLoading === 1 ? 'Loading...' : 'Alex (Beginner)'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={loading || !!demoLoading}
-                    onClick={() => handleDemoLogin(2)}
-                    className="text-xs font-semibold truncate justify-center"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 mr-1 text-primary-500 shrink-0" />
-                    {demoLoading === 2 ? 'Loading...' : 'Sam (Intermediate)'}
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
