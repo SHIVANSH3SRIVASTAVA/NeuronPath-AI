@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --bg-main: #f8fafc;
+    --text-main: #0f172a;
+  }
+  
+  html.dark,
+  :root.dark,
+  .dark {
+    color-scheme: dark;
+    --bg-main: #020617;
+    --text-main: #f8fafc;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  html.dark body {
+    background-color: #020617;
+    color: #f8fafc;
+  }
+}
