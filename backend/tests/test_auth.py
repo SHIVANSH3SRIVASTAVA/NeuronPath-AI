@@ -193,5 +193,65 @@ def test_delete_account_and_isolation():
     })
     assert login_deleted.status_code == 401
 
+def test_register_onboard_update_and_relogin_persistence():
+    email = "persistence_test@neuronpath.dev"
+    password = "SecurePassword123!"
+
+    # Clean up if existed
+    db = SessionLocal()
+    old = db.query(Learner).filter(Learner.email == email).first()
+    if old:
+        db.delete(old)
+        db.commit()
+    db.close()
+
+    # 1. Register
+    reg_res = client.post("/api/auth/register", json={
+        "name": "Persistence User",
+        "email": email,
+        "password": password
+    })
+    assert reg_res.status_code == 201
+    user_id = reg_res.json()["learner"]["id"]
+    token = reg_res.json()["access_token"]
+
+    # 2. Simulate Onboarding profile update (PUT /api/learners/{id} without email field)
+    update_res = client.put(f"/api/learners/{user_id}", json={
+        "name": "Persistence User Updated",
+        "experience_level": "intermediate",
+        "weekly_hours": 15.0
+    }, headers={"Authorization": f"Bearer {token}"})
+    assert update_res.status_code == 200
+    assert update_res.json()["email"] == email
+
+    # 3. Simulate Onboarding completion with goal
+    onboard_res = client.post(f"/api/learners/{user_id}/onboard", json={
+        "goal_text": "I want to master Python and Machine Learning in 6 months"
+    }, headers={"Authorization": f"Bearer {token}"})
+    assert onboard_res.status_code == 200
+
+    # 4. Verify in DB that email and hashed_password are still preserved
+    db = SessionLocal()
+    learner_in_db = db.query(Learner).filter(Learner.id == user_id).first()
+    assert learner_in_db is not None
+    assert learner_in_db.email == email
+    assert learner_in_db.hashed_password is not None
+    db.close()
+
+    # 5. Log out / discard token, then Log in with exact credentials
+    login_res = client.post("/api/auth/login", json={
+        "email": email,
+        "password": password
+    })
+    assert login_res.status_code == 200
+    new_token = login_res.json()["access_token"]
+    assert login_res.json()["learner"]["email"] == email
+
+    # 6. Access protected profile with new token
+    me_res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {new_token}"})
+    assert me_res.status_code == 200
+    assert me_res.json()["id"] == user_id
+
+
 
 

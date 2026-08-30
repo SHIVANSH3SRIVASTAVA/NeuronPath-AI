@@ -16,8 +16,11 @@ def update_learner(db: Session, learner_id: int, learner: LearnerUpdate):
     db_learner = get_learner(db, learner_id)
     if not db_learner:
         return None
-    for key, value in learner.model_dump().items():
-        setattr(db_learner, key, value)
+    for key, value in learner.model_dump(exclude_unset=True).items():
+        if value is not None:
+            if key == "email":
+                value = value.strip().lower()
+            setattr(db_learner, key, value)
     db.commit()
     db.refresh(db_learner)
     return db_learner
