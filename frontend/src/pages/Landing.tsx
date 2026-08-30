@@ -31,10 +31,7 @@ export default function Landing() {
             )}
           </button>
 
-          <Button variant="outline" onClick={() => navigate('/login')}>
-            Sign In
-          </Button>
-          <Button onClick={() => navigate('/register')}>
+          <Button onClick={() => navigate('/login')}>
             Get Started
           </Button>
         </div>
@@ -48,12 +45,9 @@ export default function Landing() {
           AI-powered personalized learning roadmaps tailored to your unique career goals, schedule, and learning style.
         </p>
         
-        <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Button size="lg" onClick={() => navigate('/register')} className="text-base px-8 font-semibold shadow-md inline-flex items-center gap-2">
+        <div className="flex justify-center mb-16">
+          <Button size="lg" onClick={() => navigate('/login')} className="text-base px-8 font-semibold shadow-md inline-flex items-center gap-2">
             Start Your Learning Journey <ArrowRight className="w-4 h-4" />
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => navigate('/login')} className="text-base px-6 font-semibold">
-            Sign In to Account
           </Button>
         </div>
 
