@@ -68,6 +68,20 @@ export const getLearnerGoals = async (learnerId: number): Promise<LearnerGoal[]>
     if (Array.isArray(data) && data.length > 0) return data;
   } catch {}
 
+  try {
+    const { data } = await apiClient.get<any>(`/learners/${learnerId}/roadmap`);
+    if (data && data.goal) {
+      return [{
+        id: data.goal.id || data.goal_id || 1,
+        learner_id: learnerId,
+        title: data.goal.title || 'Learning Goal',
+        target_role: data.goal.target_role || data.goal.title || 'Learning Goal',
+        timeline_months: data.goal.timeline_months || 6,
+        status: 'active'
+      }];
+    }
+  } catch {}
+
   return [];
 };
 

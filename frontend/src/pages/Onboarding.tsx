@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { OnboardingChat } from '../components/onboarding/OnboardingChat';
 import { ProfileConfirmation } from '../components/onboarding/ProfileConfirmation';
 import { useAppStore } from '../store/useAppStore';
-import { createLearner, onboardLearner, updateLearner, updateLearnerGoal, getLearner } from '../api/learner';
+import { createLearner, onboardLearner, updateLearner, updateLearnerGoal, getLearner, getLearnerGoals } from '../api/learner';
 import { generateRoadmap } from '../api/roadmap';
 import { OnboardingResult } from '../types';
 import { AlertCircle } from 'lucide-react';
@@ -108,10 +108,19 @@ export default function Onboarding() {
         console.warn('Roadmap generation trigger acknowledged:', rmErr);
       }
       
-      // Refresh current learner in store
+      // Refresh current learner and goals in store
       const refreshedLearner = await getLearner(id);
       setCurrentLearner(refreshedLearner);
       setOnboarded(true);
+
+      try {
+        const goalsData = await getLearnerGoals(id);
+        if (goalsData && goalsData.length > 0) {
+          useAppStore.getState().setGoals(goalsData);
+        }
+      } catch (gErr) {
+        console.warn('Goals fetch acknowledged:', gErr);
+      }
 
       navigate('/dashboard');
     } catch (err: any) {

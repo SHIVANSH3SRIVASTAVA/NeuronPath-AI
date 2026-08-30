@@ -71,18 +71,56 @@ export const useAppStore = create<AppState>()(
       activeGoal: null,
       activeGoalVersion: 0,
       setGoals: (goals) => {
-        const active = goals.find(g => g.status === 'active') || (goals.length > 0 ? goals[0] : null);
-        set({ goals, activeGoal: active });
+        if (!goals || goals.length === 0) {
+          const currentActive = get().activeGoal;
+          if (currentActive) {
+            set({ goals: [{ ...currentActive, status: 'active' }] });
+          } else {
+            set({ goals: [], activeGoal: null });
+          }
+          return;
+        }
+
+        const currentActive = get().activeGoal;
+        let matchedActive = currentActive ? goals.find(g => g.id === currentActive.id) : null;
+        if (!matchedActive) {
+          matchedActive = goals.find(g => g.status === 'active') || goals[0];
+        }
+
+        const normalizedGoals = goals.map(g => ({
+          ...g,
+          status: (matchedActive && g.id === matchedActive.id) ? 'active' : 'inactive'
+        }));
+
+        set({
+          goals: normalizedGoals,
+          activeGoal: matchedActive ? { ...matchedActive, status: 'active' } : null
+        });
       },
       setActiveGoal: (goal) => {
-        set((state) => ({
-          activeGoal: goal,
-          goals: state.goals.map(g => ({
+        if (!goal) {
+          set((state) => ({ activeGoal: null, goals: [], activeGoalVersion: state.activeGoalVersion + 1 }));
+          return;
+        }
+
+        set((state) => {
+          let updatedGoals = state.goals;
+          const exists = state.goals.some(g => g.id === goal.id);
+          if (!exists) {
+            updatedGoals = [{ ...goal, status: 'active' }, ...state.goals];
+          }
+
+          const normalized = updatedGoals.map(g => ({
             ...g,
-            status: (goal && g.id === goal.id) ? 'active' : 'inactive'
-          })),
-          activeGoalVersion: state.activeGoalVersion + 1
-        }));
+            status: g.id === goal.id ? 'active' : 'inactive'
+          }));
+
+          return {
+            activeGoal: { ...goal, status: 'active' },
+            goals: normalized,
+            activeGoalVersion: state.activeGoalVersion + 1
+          };
+        });
       },
       triggerGoalUpdate: () => set((state) => ({ activeGoalVersion: state.activeGoalVersion + 1 })),
       setAuth: (token, learner) => {
@@ -139,6 +177,7 @@ export const useAppStore = create<AppState>()(
         isAuthenticated: state.isAuthenticated,
         isOnboarded: state.isOnboarded,
         theme: state.theme,
+        goals: state.goals,
         activeGoal: state.activeGoal,
       }),
       onRehydrateStorage: () => (state) => {
@@ -146,6 +185,9 @@ export const useAppStore = create<AppState>()(
           applyThemeToDom(state.theme || 'light');
           if (state.token && state.currentLearner) {
             state.isAuthenticated = true;
+          }
+          if (state.activeGoal && (!state.goals || state.goals.length === 0)) {
+            state.goals = [{ ...state.activeGoal, status: 'active' }];
           }
         }
       },

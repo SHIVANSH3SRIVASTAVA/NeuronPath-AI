@@ -128,7 +128,7 @@ def get_learner_goals(db: Session, learner_id: int):
     """Retrieve all goals for a learner, sorted with active goal first."""
     goals = db.query(LearnerGoal).filter(
         LearnerGoal.learner_id == learner_id
-    ).order_by(LearnerGoal.created_at.desc()).all()
+    ).order_by(LearnerGoal.id.desc()).all()
     
     # If no goal is active but goals exist, activate the first one
     active = next((g for g in goals if g.status == "active"), None)
@@ -137,7 +137,7 @@ def get_learner_goals(db: Session, learner_id: int):
         db.commit()
         db.refresh(goals[0])
         
-    return sorted(goals, key=lambda g: (0 if g.status == "active" else 1, g.id))
+    return sorted(goals, key=lambda g: (0 if g.status == "active" else 1, -g.id))
 
 def create_goal(db: Session, learner_id: int, title: str, target_role: str, timeline_months: int, set_active: bool = True):
     """Create a new goal for a learner and attach skill requirements."""

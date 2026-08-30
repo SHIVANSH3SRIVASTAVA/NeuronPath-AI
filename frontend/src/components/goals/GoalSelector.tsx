@@ -53,9 +53,16 @@ export default function GoalSelector() {
     setLoadingGoals(true);
     try {
       const data = await getLearnerGoals(currentLearner.id);
-      setGoals(data);
+      if (data && data.length > 0) {
+        setGoals(data);
+      } else if (activeGoal) {
+        setGoals([{ ...activeGoal, status: 'active' }]);
+      }
     } catch (err) {
       console.error('Failed to fetch goals:', err);
+      if (activeGoal && (!goals || goals.length === 0)) {
+        setGoals([{ ...activeGoal, status: 'active' }]);
+      }
     } finally {
       setLoadingGoals(false);
     }
@@ -63,7 +70,24 @@ export default function GoalSelector() {
 
   useEffect(() => {
     fetchGoals();
-  }, [currentLearner?.id]);
+  }, [currentLearner?.id, activeGoal?.id]);
+
+  // Merge activeGoal into goals list if it's missing from the array
+  const displayGoals = React.useMemo(() => {
+    let list = Array.isArray(goals) ? [...goals] : [];
+    if (activeGoal) {
+      const idx = list.findIndex(g => g.id === activeGoal.id);
+      if (idx === -1) {
+        list = [{ ...activeGoal, status: 'active' }, ...list.map(g => ({ ...g, status: 'inactive' }))];
+      } else {
+        list = list.map(g => ({
+          ...g,
+          status: g.id === activeGoal.id ? 'active' : 'inactive'
+        }));
+      }
+    }
+    return list;
+  }, [goals, activeGoal]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -89,6 +113,10 @@ export default function GoalSelector() {
       setIsOpen(false);
     } catch (err) {
       console.error('Failed to activate goal:', err);
+      // Still switch active goal in store locally
+      setActiveGoal(goal);
+      triggerGoalUpdate();
+      setIsOpen(false);
     } finally {
       setSwitchingGoalId(null);
     }
@@ -167,7 +195,12 @@ export default function GoalSelector() {
     <div className="relative" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen) {
+            fetchGoals();
+          }
+          setIsOpen(!isOpen);
+        }}
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 transition-all text-xs sm:text-sm font-medium shadow-2xs group max-w-[200px] sm:max-w-[280px] truncate"
         title="Switch or manage learning goals"
       >
@@ -192,7 +225,7 @@ export default function GoalSelector() {
             <div className="flex items-center gap-2">
               <Compass className="w-4 h-4 text-primary-600 dark:text-primary-400" />
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                Your Goals ({goals.length})
+                Your Goals ({displayGoals.length})
               </span>
             </div>
             <button
@@ -209,12 +242,12 @@ export default function GoalSelector() {
 
           {/* Goal List */}
           <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 p-1.5">
-            {goals.length === 0 ? (
+            {displayGoals.length === 0 ? (
               <div className="p-4 text-center text-xs text-slate-500 dark:text-slate-400">
                 No goals created yet.
               </div>
             ) : (
-              goals.map((g) => {
+              displayGoals.map((g) => {
                 const isActive = activeGoal?.id === g.id;
                 const isSwitching = switchingGoalId === g.id;
 
