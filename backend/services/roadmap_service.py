@@ -294,8 +294,50 @@ def generate_roadmap(db: Session, learner_id: int):
     db.add_all(item_objs)
     db.commit()
     
-    roadmap.milestones = milestone_objs
-    return roadmap
+    return {
+        "id": roadmap.id,
+        "learner_id": learner_id,
+        "goal_id": goal.id,
+        "status": "active",
+        "milestones": [
+            {
+                "id": m.id,
+                "roadmap_id": roadmap.id,
+                "order_index": m.order_index,
+                "title": m.title,
+                "objective": m.objective or "",
+                "status": m.status,
+                "estimated_hours": float(m.estimated_hours or 8.0),
+                "skill_ids": m.skill_ids or [],
+                "completion_criteria": m.completion_criteria or "",
+                "items": [
+                    {
+                        "id": it.id,
+                        "milestone_id": m.id,
+                        "item_type": it.item_type,
+                        "status": it.status,
+                        "resource": {
+                            "id": it.resource.id,
+                            "title": it.resource.title,
+                            "type": it.resource.type,
+                            "provider": it.resource.provider,
+                            "url": it.resource.url,
+                            "difficulty": it.resource.difficulty,
+                            "duration_hours": float(it.resource.duration_hours or 0.0),
+                            "quality_score": float(it.resource.quality_score or 50.0),
+                            "description": it.resource.description or "",
+                            "skill_ids": it.resource.skill_ids or [],
+                            "prerequisite_skill_ids": it.resource.prerequisite_skill_ids or []
+                        } if it.resource else None,
+                        "project": None,
+                        "completed_at": None
+                    }
+                    for it in (m.items if hasattr(m, "items") else [])
+                ]
+            }
+            for m in milestone_objs
+        ]
+    }
 
 def get_next_action(db: Session, learner_id: int):
     roadmap = db.query(Roadmap).filter(
