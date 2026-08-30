@@ -145,16 +145,19 @@ def set_or_update_goal(learner_id: int, req: CustomGoalUpdateRequest, db: Sessio
         "timeline_months": goal.timeline_months
     }
 
+class ActionPayload(BaseModel):
+    extra: Optional[dict] = None
+
 @router.get("/{learner_id}/next-action")
 def learner_next_action(learner_id: int, db: Session = Depends(get_db)):
     return get_next_action(db, learner_id)
 
 @router.post("/{learner_id}/roadmap", response_model=RoadmapResponse)
-def create_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
+async def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
     roadmap = generate_roadmap(db, learner_id)
     if not roadmap:
         raise HTTPException(status_code=400, detail="Could not generate roadmap")
-    return roadmap
+    return get_learner_roadmap(learner_id, db)
 
 @router.get("/{learner_id}/roadmap", response_model=RoadmapResponse)
 def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
@@ -176,7 +179,7 @@ def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
     return RoadmapResponse.model_validate(loaded_roadmap)
 
 @router.post("/{learner_id}/roadmap/milestones/{milestone_id}/start")
-def start_milestone_endpoint(learner_id: int, milestone_id: int, db: Session = Depends(get_db)):
+async def start_milestone_endpoint(learner_id: int, milestone_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
     roadmap = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
         Roadmap.status.in_(["active", "completed"])
@@ -212,7 +215,7 @@ def start_milestone_endpoint(learner_id: int, milestone_id: int, db: Session = D
     }
 
 @router.post("/{learner_id}/roadmap/items/{item_id}/complete")
-def complete_item_endpoint(learner_id: int, item_id: int, db: Session = Depends(get_db)):
+async def complete_item_endpoint(learner_id: int, item_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
     roadmap = db.query(Roadmap).filter(
         Roadmap.learner_id == learner_id, 
         Roadmap.status.in_(["active", "completed"])

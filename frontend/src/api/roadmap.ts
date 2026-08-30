@@ -7,16 +7,16 @@ export const getRoadmap = async (learnerId: number) => {
 };
 
 export const generateRoadmap = async (learnerId: number) => {
-  const { data } = await apiClient.post<Roadmap>(`/learners/${learnerId}/roadmap`);
+  const { data } = await apiClient.post<Roadmap>(`/learners/${learnerId}/roadmap`, {});
   return data;
 };
 
 export const startMilestone = async (learnerId: number, milestoneId: number) => {
-  const { data } = await apiClient.post(`/learners/${learnerId}/roadmap/milestones/${milestoneId}/start`);
+  const { data } = await apiClient.post(`/learners/${learnerId}/roadmap/milestones/${milestoneId}/start`, {});
   return data;
 };
 
 export const markItemComplete = async (learnerId: number, itemId: number) => {
-  const { data } = await apiClient.post(`/learners/${learnerId}/roadmap/items/${itemId}/complete`);
+  const { data } = await apiClient.post(`/learners/${learnerId}/roadmap/items/${itemId}/complete`, {});
   return data;
 };
