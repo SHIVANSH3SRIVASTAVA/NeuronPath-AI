@@ -158,6 +158,30 @@ export interface CategorizedSkillItem {
   self_reported: number | null;
 }
 
+export interface ProgressionPoint {
+  id: string;
+  label: string;
+  title: string;
+  order_index: number;
+  status: 'completed' | 'in_progress' | 'available' | 'locked';
+  progress: number;
+  target_progress: number;
+  mastery: number;
+  assessment_score: number | null;
+  completed_items: number;
+  total_items: number;
+  estimated_hours?: number;
+  date?: string;
+  is_current?: boolean;
+}
+
+export interface AssessmentHistoryItem {
+  id: number;
+  score: number;
+  date: string;
+  skill_scores?: Record<string, number>;
+}
+
 export interface ProgressData {
   overall_progress: number;
   milestones_completed: number;
@@ -175,6 +199,14 @@ export interface ProgressData {
   total_learning_hours: number;
   assessments_taken: number;
   average_score: number;
+  current_mastery?: number;
+  baseline_mastery?: number;
+  mastery_growth?: number;
+  velocity_status?: string;
+  velocity_badge?: string;
+  current_milestone_title?: string;
+  progression_timeline?: ProgressionPoint[];
+  assessment_history?: AssessmentHistoryItem[];
   skill_growth: Array<{ skill: string; before: number; after: number }>;
   recent_activity: Array<{ type: string; description: string; date: string }>;
 }

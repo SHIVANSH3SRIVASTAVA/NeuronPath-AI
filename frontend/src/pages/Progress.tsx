@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { Progress } from '../components/ui/Progress';
 import { Skeleton } from '../components/ui/Skeleton';
 import { ActivityTimeline } from '../components/progress/ActivityTimeline';
-import { TrendingUp, BarChart3, PieChart } from 'lucide-react';
+import { MasteryGrowthChart } from '../components/progress/MasteryGrowthChart';
+import { TrendingUp, PieChart } from 'lucide-react';
 
 export default function ProgressPage() {
   const { currentLearner } = useAppStore();
@@ -47,8 +48,6 @@ export default function ProgressPage() {
     return <div className="p-8 text-center text-slate-600 dark:text-slate-400">No progress data available.</div>;
   }
 
-  const chartHeights = [20, 35, 50, 65, 45, 80, progressData.overall_progress || 10];
-
   return (
     <div className="space-y-6 pb-12 max-w-6xl mx-auto">
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
@@ -61,23 +60,7 @@ export default function ProgressPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="col-span-1 md:col-span-2">
-          <CardHeader className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-primary-600 dark:text-primary-400" /> Learning Velocity & Mastery Growth
-            </h2>
-          </CardHeader>
-          <CardContent className="h-64 flex items-end gap-3 justify-between p-6">
-            {chartHeights.map((h, i) => (
-              <div key={i} className="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg relative group flex-1 mx-1 h-full flex items-end">
-                <div 
-                  className="w-full bg-primary-500 dark:bg-primary-600 hover:bg-primary-400 dark:hover:bg-primary-500 rounded-t-lg transition-all duration-300 shadow-xs" 
-                  style={{ height: `${Math.max(8, h)}%` }}
-                />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <MasteryGrowthChart progressData={progressData} />
         
         <Card>
           <CardHeader>
