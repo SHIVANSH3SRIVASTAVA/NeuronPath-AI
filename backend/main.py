@@ -57,7 +57,11 @@ app.add_middleware(
 
 for router, prefix, tags in routers:
     app.include_router(router, prefix=prefix, tags=tags)
+    if prefix.startswith("/api/"):
+        alt_prefix = prefix[4:]
+        app.include_router(router, prefix=alt_prefix, tags=tags)
 
 @app.get("/health", tags=["health"])
+@app.get("/api/health", tags=["health"])
 def health_check():
     return {"status": "ok"}

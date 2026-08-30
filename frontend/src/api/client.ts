@@ -5,8 +5,13 @@ import axios from 'axios';
 // 2. In local development with Vite dev server (port 5173/3000), route through Vite proxy '/api'.
 // 3. Otherwise fall back to local backend on port 8000.
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+  let url = import.meta.env.VITE_API_URL;
+  if (url) {
+    url = url.replace(/\/+$/, '');
+    if (!url.endsWith('/api')) {
+      url = `${url}/api`;
+    }
+    return url;
   }
   if (typeof window !== 'undefined') {
     if (window.location.port === '5173' || window.location.port === '3000') {
