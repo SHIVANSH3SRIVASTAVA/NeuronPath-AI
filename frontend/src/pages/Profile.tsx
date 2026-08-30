@@ -29,6 +29,7 @@ export default function Profile() {
     try {
       const updated = await updateLearner(currentLearner.id, { 
         name, 
+        email: currentLearner.email,
         weekly_hours: hours,
         experience_level: experienceLevel,
         preferred_formats: [learningStyle]

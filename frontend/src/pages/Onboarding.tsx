@@ -85,6 +85,7 @@ export default function Onboarding() {
         // Save any manual edits to learner profile
         await updateLearner(id, {
           name: activeData.name,
+          email: useAppStore.getState().currentLearner?.email,
           experience_level: activeData.experience_level as any,
           weekly_hours: activeData.weekly_hours,
         });
