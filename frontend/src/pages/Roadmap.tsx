@@ -61,12 +61,12 @@ export default function RoadmapPage() {
     try {
       await startMilestone(currentLearner.id, selectedMilestone.id);
       const updatedList = roadmap?.milestones.map(m => 
-        m.id === selectedMilestone.id ? { ...m, status: 'in_progress' } : m
+        m.id === selectedMilestone.id ? { ...m, status: 'in_progress' as const } : m
       ) || [];
       if (roadmap) {
         setRoadmap({ ...roadmap, milestones: updatedList });
       }
-      setSelectedMilestone(prev => prev ? { ...prev, status: 'in_progress' } : null);
+      setSelectedMilestone(prev => prev ? { ...prev, status: 'in_progress' as const } : null);
 
       const refreshed = await fetchRoadmap();
       if (refreshed && selectedMilestone) {

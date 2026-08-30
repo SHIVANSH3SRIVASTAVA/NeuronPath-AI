@@ -39,13 +39,14 @@ export default function Dashboard() {
       }
       
       if (actionResult.status === 'fulfilled' && actionResult.value) {
-        const act = actionResult.value;
+        const act = actionResult.value as any;
         setNextAction({
           action: act.action || 'start_resource',
           description: act.description || act.message || 'Continue your learning roadmap.',
           type: (act.action || '').includes('resource') ? 'resource' : (act.action || '').includes('assessment') ? 'assessment' : 'milestone',
-          id: act.resource_id || act.milestone_id,
-          title: act.title
+          resource_id: act.resource_id,
+          assessment_id: act.assessment_id,
+          milestone_title: act.title || act.milestone_title
         });
       }
       

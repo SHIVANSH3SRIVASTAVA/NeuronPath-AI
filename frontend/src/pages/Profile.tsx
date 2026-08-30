@@ -73,7 +73,7 @@ export default function Profile() {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">Experience Level</label>
             <select 
               value={experienceLevel} 
-              onChange={e => setExperienceLevel(e.target.value)}
+              onChange={e => setExperienceLevel(e.target.value as 'beginner' | 'intermediate' | 'advanced')}
               disabled={saving}
               className="w-full p-2.5 text-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
