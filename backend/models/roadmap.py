@@ -35,7 +35,7 @@ class Roadmap(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    milestones = relationship("RoadmapMilestone", lazy="joined", order_by="RoadmapMilestone.order_index")
+    milestones = relationship("RoadmapMilestone", lazy="selectin", order_by="RoadmapMilestone.order_index")
     goal = relationship("LearnerGoal", lazy="joined")
 
 class RoadmapMilestone(Base):
@@ -52,7 +52,7 @@ class RoadmapMilestone(Base):
     completion_criteria = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    items = relationship("MilestoneItem", lazy="joined")
+    items = relationship("MilestoneItem", lazy="selectin")
 
 class MilestoneItem(Base):
     __tablename__ = "milestone_items"
