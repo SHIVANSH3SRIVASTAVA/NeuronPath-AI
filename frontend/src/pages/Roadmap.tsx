@@ -43,7 +43,8 @@ export default function RoadmapPage() {
     setProcessing(true);
     setError(null);
     try {
-      const newRoadmap = await generateRoadmap(currentLearner.id);
+      await generateRoadmap(currentLearner.id);
+      const newRoadmap = await getRoadmap(currentLearner.id);
       setRoadmap(newRoadmap);
       setSelectedMilestone(null);
     } catch (err: any) {

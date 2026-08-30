@@ -152,22 +152,17 @@ class ActionPayload(BaseModel):
 def learner_next_action(learner_id: int, db: Session = Depends(get_db)):
     return get_next_action(db, learner_id)
 
-@router.post("/{learner_id}/roadmap", response_model=RoadmapResponse)
+@router.post("/{learner_id}/roadmap")
 def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = None, db: Session = Depends(get_db)):
-    generate_roadmap(db, learner_id)
-    
-    roadmap = db.query(Roadmap).options(
-        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource),
-        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.project)
-    ).filter(
-        Roadmap.learner_id == learner_id, 
-        Roadmap.status.in_(["active", "completed"])
-    ).order_by(Roadmap.created_at.desc()).first()
-    
+    roadmap = generate_roadmap(db, learner_id)
     if not roadmap:
         raise HTTPException(status_code=400, detail="Could not generate roadmap")
-        
-    return RoadmapResponse.model_validate(roadmap)
+    return {
+        "status": "success",
+        "roadmap_id": roadmap.id,
+        "learner_id": learner_id,
+        "message": "Roadmap generated successfully"
+    }
 
 @router.get("/{learner_id}/roadmap", response_model=RoadmapResponse)
 def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db)):
