@@ -8,7 +8,10 @@ if db_url.startswith("postgres://"):
 
 engine = create_engine(
     db_url, 
-    connect_args={"check_same_thread": False} if "sqlite" in db_url else {"connect_timeout": 10},
+    connect_args={"check_same_thread": False} if "sqlite" in db_url else {
+        "connect_timeout": 10,
+        "options": "-c statement_timeout=25000 -c lock_timeout=10000"
+    },
     pool_pre_ping=True,
     pool_recycle=300,
 )
@@ -21,5 +24,8 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
