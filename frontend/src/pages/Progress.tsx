@@ -9,7 +9,7 @@ import { MasteryGrowthChart } from '../components/progress/MasteryGrowthChart';
 import { TrendingUp, PieChart } from 'lucide-react';
 
 export default function ProgressPage() {
-  const { currentLearner, activeGoalVersion, activeGoal } = useAppStore();
+  const { currentLearner } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -18,14 +18,14 @@ export default function ProgressPage() {
     if (!currentLearner) return;
     setLoading(true);
     setError(null);
-    getProgress(currentLearner.id, activeGoal?.id)
+    getProgress(currentLearner.id)
       .then(setProgressData)
       .catch(err => {
         console.error(err);
         setError('Failed to load progress data.');
       })
       .finally(() => setLoading(false));
-  }, [currentLearner, activeGoalVersion, activeGoal?.id]);
+  }, [currentLearner]);
 
   if (!currentLearner) {
     return <div className="p-8 text-center text-slate-600 dark:text-slate-400">Please complete onboarding to view progress analytics.</div>;

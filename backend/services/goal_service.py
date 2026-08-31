@@ -124,38 +124,22 @@ def derive_skill_requirements(target_role: str, title: str, all_skills: list) ->
         ("Databases & SQL", 80, 0.8),
     ]
 
-def get_learner_goals(db: Session, learner_id: int):
-    """Retrieve all goals for a learner, sorted with active goal first."""
-    goals = db.query(LearnerGoal).filter(
-        LearnerGoal.learner_id == learner_id
-    ).order_by(LearnerGoal.id.desc()).all()
-    
-    # If no goal is active but goals exist, activate the first one
-    active = next((g for g in goals if g.status == "active"), None)
-    if not active and goals:
-        goals[0].status = "active"
-        db.commit()
-        db.refresh(goals[0])
-        
-    return sorted(goals, key=lambda g: (0 if g.status == "active" else 1, -g.id))
-
-def create_goal(db: Session, learner_id: int, title: str, target_role: str, timeline_months: int, set_active: bool = True):
-    """Create a new goal for a learner and attach skill requirements."""
-    if set_active:
-        existing_goals = db.query(LearnerGoal).filter(
-            LearnerGoal.learner_id == learner_id,
-            LearnerGoal.status == "active"
-        ).all()
-        for g in existing_goals:
-            g.status = "inactive"
-        db.commit()
+def create_goal(db: Session, learner_id: int, title: str, target_role: str, timeline_months: int):
+    """Create or replace the active goal for a learner and attach skill requirements."""
+    existing_goals = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id,
+        LearnerGoal.status == "active"
+    ).all()
+    for g in existing_goals:
+        g.status = "superseded"
+    db.commit()
 
     goal = LearnerGoal(
         learner_id=learner_id,
         title=title,
         target_role=target_role,
         timeline_months=timeline_months,
-        status="active" if set_active else "inactive"
+        status="active"
     )
     db.add(goal)
     db.commit()
@@ -191,81 +175,3 @@ def create_goal(db: Session, learner_id: int, title: str, target_role: str, time
             
     db.commit()
     return goal
-
-def activate_goal(db: Session, learner_id: int, goal_id: int):
-    """Switch active goal: set target goal to active and others to inactive."""
-    goal = db.query(LearnerGoal).filter(
-        LearnerGoal.id == goal_id,
-        LearnerGoal.learner_id == learner_id
-    ).first()
-    if not goal:
-        return None
-        
-    all_goals = db.query(LearnerGoal).filter(
-        LearnerGoal.learner_id == learner_id
-    ).all()
-    for g in all_goals:
-        g.status = "active" if g.id == goal_id else "inactive"
-        
-    db.commit()
-    db.refresh(goal)
-    return goal
-
-def delete_goal(db: Session, learner_id: int, goal_id: int):
-    """
-    Safely delete a specific goal and its associated roadmap & milestones.
-    Does NOT touch the learner account or other goals.
-    If the deleted goal was active, activates another existing goal.
-    """
-    goal = db.query(LearnerGoal).filter(
-        LearnerGoal.id == goal_id,
-        LearnerGoal.learner_id == learner_id
-    ).first()
-    if not goal:
-        return None
-        
-    was_active = (goal.status == "active")
-    
-    from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem
-    
-    # 1. Delete Roadmaps & Milestone Items for this goal
-    roadmaps = db.query(Roadmap).filter(
-        Roadmap.learner_id == learner_id,
-        Roadmap.goal_id == goal_id
-    ).all()
-    for rm in roadmaps:
-        milestones = db.query(RoadmapMilestone).filter(RoadmapMilestone.roadmap_id == rm.id).all()
-        for ms in milestones:
-            db.query(MilestoneItem).filter(MilestoneItem.milestone_id == ms.id).delete()
-        db.query(RoadmapMilestone).filter(RoadmapMilestone.roadmap_id == rm.id).delete()
-        db.delete(rm)
-        
-    # 2. Delete Goal Skill Requirements
-    db.query(GoalSkillRequirement).filter(GoalSkillRequirement.goal_id == goal_id).delete()
-    
-    # 3. Delete the Goal itself
-    db.delete(goal)
-    db.commit()
-    
-    # 4. If deleted goal was active, automatically activate the next existing goal
-    new_active_goal = None
-    remaining_goals = db.query(LearnerGoal).filter(
-        LearnerGoal.learner_id == learner_id
-    ).order_by(LearnerGoal.created_at.desc()).all()
-    
-    if was_active and remaining_goals:
-        remaining_goals[0].status = "active"
-        for other in remaining_goals[1:]:
-            other.status = "inactive"
-        db.commit()
-        db.refresh(remaining_goals[0])
-        new_active_goal = remaining_goals[0]
-    elif not was_active and remaining_goals:
-        new_active_goal = next((g for g in remaining_goals if g.status == "active"), remaining_goals[0])
-        
-    return {
-        "deleted_goal_id": goal_id,
-        "active_goal": new_active_goal,
-        "remaining_goals": remaining_goals
-    }
-

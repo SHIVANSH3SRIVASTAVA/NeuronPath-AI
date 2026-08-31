@@ -55,16 +55,7 @@ export interface LearnerGoal {
   title: string;
   target_role: string;
   timeline_months: number;
-  status: 'active' | 'inactive' | 'completed' | string;
-  created_at?: string;
-}
-
-export interface GoalDeleteResult {
   status: string;
-  message: string;
-  deleted_goal_id: number;
-  active_goal: LearnerGoal | null;
-  remaining_goals: LearnerGoal[];
 }
 
 export interface RoadmapMilestone {

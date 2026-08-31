@@ -11,7 +11,7 @@ import { Button } from '../components/ui/Button';
 import { Map, RefreshCw, AlertCircle } from 'lucide-react';
 
 export default function RoadmapPage() {
-  const { currentLearner, activeGoalVersion, activeGoal } = useAppStore();
+  const { currentLearner } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
@@ -23,7 +23,7 @@ export default function RoadmapPage() {
     setLoading(true);
     setError(null);
     try {
-      const rMap = await getRoadmap(currentLearner.id, activeGoal?.id);
+      const rMap = await getRoadmap(currentLearner.id);
       setRoadmap(rMap);
       return rMap;
     } catch (err: any) {
@@ -36,15 +36,16 @@ export default function RoadmapPage() {
 
   useEffect(() => {
     fetchRoadmap();
-  }, [currentLearner, activeGoalVersion, activeGoal?.id]);
+  }, [currentLearner]);
 
   const handleRecalculate = async () => {
     if (!currentLearner) return;
     setProcessing(true);
     setError(null);
     try {
-      await generateRoadmap(currentLearner.id, activeGoal?.id);
-      await fetchRoadmap();
+      await generateRoadmap(currentLearner.id);
+      const newRoadmap = await getRoadmap(currentLearner.id);
+      setRoadmap(newRoadmap);
       setSelectedMilestone(null);
     } catch (err: any) {
       console.error('Roadmap calculation error:', err);

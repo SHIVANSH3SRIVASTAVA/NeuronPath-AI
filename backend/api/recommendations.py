@@ -14,12 +14,9 @@ from recommendation.engine import rank_resources
 router = APIRouter()
 
 @router.get("")
-def get_recommendations(learner_id: int, goal_id: Optional[int] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+def get_recommendations(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     learner = db.query(Learner).filter(Learner.id == learner_id).first()
-    if goal_id:
-        goal = db.query(LearnerGoal).filter(LearnerGoal.id == goal_id, LearnerGoal.learner_id == learner_id).first()
-    else:
-        goal = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id, LearnerGoal.status == "active").order_by(LearnerGoal.id.desc()).first()
+    goal = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id, LearnerGoal.status == "active").first()
     if not goal:
         return []
         

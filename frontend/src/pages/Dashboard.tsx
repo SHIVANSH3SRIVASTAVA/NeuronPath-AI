@@ -9,14 +9,14 @@ import { RecentActivity } from '../components/dashboard/RecentActivity';
 import { Skeleton } from '../components/ui/Skeleton';
 import { Button } from '../components/ui/Button';
 import { getProgress } from '../api/progress';
-import { getNextAction as fetchNextAction, getLearnerGoals } from '../api/learner';
+import { getNextAction as fetchNextAction } from '../api/learner';
 import { getRoadmap } from '../api/roadmap';
 import { ProgressData, NextAction, Roadmap } from '../types';
 import { Sparkles, Map, Target } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { currentLearner, activeGoalVersion, activeGoal } = useAppStore();
+  const { currentLearner } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -29,12 +29,10 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     
-    const goalId = activeGoal?.id;
-
     Promise.allSettled([
-      getProgress(currentLearner.id, goalId),
-      fetchNextAction(currentLearner.id, goalId),
-      getRoadmap(currentLearner.id, goalId),
+      getProgress(currentLearner.id),
+      fetchNextAction(currentLearner.id),
+      getRoadmap(currentLearner.id),
     ]).then(([progResult, actionResult, roadmapResult]) => {
       if (progResult.status === 'fulfilled') {
         setProgressData(progResult.value);
@@ -54,20 +52,6 @@ export default function Dashboard() {
       
       if (roadmapResult.status === 'fulfilled' && roadmapResult.value) {
         setRoadmap(roadmapResult.value);
-        if (roadmapResult.value.goal) {
-          const rmGoal = roadmapResult.value.goal;
-          const currentStore = useAppStore.getState();
-          if (!currentStore.activeGoal || currentStore.activeGoal.id !== rmGoal.id) {
-            currentStore.setActiveGoal({
-              id: rmGoal.id || roadmapResult.value.goal_id || 1,
-              learner_id: currentLearner.id,
-              title: rmGoal.title || 'Learning Goal',
-              target_role: rmGoal.target_role || rmGoal.title || 'Learning Goal',
-              timeline_months: rmGoal.timeline_months || 6,
-              status: 'active'
-            });
-          }
-        }
       } else {
         setRoadmap(null);
       }
@@ -77,16 +61,7 @@ export default function Dashboard() {
     }).finally(() => {
       setLoading(false);
     });
-
-    // Ensure store goals list is populated
-    if (useAppStore.getState().goals.length === 0) {
-      getLearnerGoals(currentLearner.id).then(gList => {
-        if (gList && gList.length > 0) {
-          useAppStore.getState().setGoals(gList);
-        }
-      }).catch(() => {});
-    }
-  }, [currentLearner, activeGoalVersion, activeGoal?.id]);
+  }, [currentLearner]);
 
   if (!currentLearner) {
     return (
@@ -121,7 +96,7 @@ export default function Dashboard() {
     );
   }
 
-  const goalTitle = activeGoal ? (activeGoal.target_role || activeGoal.title) : (roadmap?.goal?.title || 'Personalized Learning Goal');
+  const goalTitle = roadmap?.goal?.title || 'Personalized Learning Goal';
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10">

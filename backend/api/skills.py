@@ -12,18 +12,7 @@ from recommendation.skill_gap import calculate_skill_gaps
 router = APIRouter()
 
 @router.get("", response_model=list[LearnerSkillResponse])
-def get_skills(learner_id: int, goal_id: Optional[int] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
-    if goal_id:
-        goal = db.query(LearnerGoal).filter(LearnerGoal.id == goal_id, LearnerGoal.learner_id == learner_id).first()
-    else:
-        goal = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id, LearnerGoal.status == "active").order_by(LearnerGoal.id.desc()).first()
-        
-    if goal:
-        reqs = db.query(GoalSkillRequirement).filter(GoalSkillRequirement.goal_id == goal.id).all()
-        if reqs:
-            req_skill_ids = {r.skill_id for r in reqs}
-            all_s = get_learner_skills(db, learner_id)
-            return [s for s in all_s if s.skill_id in req_skill_ids]
+def get_skills(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
     return get_learner_skills(db, learner_id)
 
 @router.put("/{skill_id}", response_model=LearnerSkillResponse)
@@ -31,11 +20,8 @@ def update_skill(learner_id: int, skill_id: int, req: LearnerSkillUpdate, db: Se
     return update_learner_skill(db, learner_id, skill_id, req.self_reported_level, req.demonstrated_level)
 
 @router.get("/gaps", response_model=list[SkillGapResponse])
-def get_skill_gaps(learner_id: int, goal_id: Optional[int] = None, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
-    if goal_id:
-        goal = db.query(LearnerGoal).filter(LearnerGoal.id == goal_id, LearnerGoal.learner_id == learner_id).first()
-    else:
-        goal = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id, LearnerGoal.status == "active").order_by(LearnerGoal.id.desc()).first()
+def get_skill_gaps(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
+    goal = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id, LearnerGoal.status == "active").first()
     if not goal:
         return []
         
