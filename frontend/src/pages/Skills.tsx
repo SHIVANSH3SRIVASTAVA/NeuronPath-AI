@@ -9,7 +9,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { Brain, Sparkles } from 'lucide-react';
 
 export default function Skills() {
-  const { currentLearner } = useAppStore();
+  const { currentLearner, goalsVersion, activeGoal } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [gaps, setGaps] = useState<SkillGap[]>([]);
   const [selectedGap, setSelectedGap] = useState<SkillGap | null>(null);
@@ -42,7 +42,7 @@ export default function Skills() {
         setError('Failed to load skill gaps.');
       })
       .finally(() => setLoading(false));
-  }, [currentLearner]);
+  }, [currentLearner, goalsVersion, activeGoal?.id]);
 
   if (!currentLearner) {
     return <div className="p-8 text-center text-slate-600 dark:text-slate-400">Please complete onboarding to view your skills map.</div>;

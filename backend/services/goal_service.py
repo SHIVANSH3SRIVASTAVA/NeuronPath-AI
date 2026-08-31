@@ -124,22 +124,100 @@ def derive_skill_requirements(target_role: str, title: str, all_skills: list) ->
         ("Databases & SQL", 80, 0.8),
     ]
 
-def create_goal(db: Session, learner_id: int, title: str, target_role: str, timeline_months: int):
-    """Create or replace the active goal for a learner and attach skill requirements."""
-    existing_goals = db.query(LearnerGoal).filter(
+from fastapi import HTTPException, status
+
+def get_learner_goals(db: Session, learner_id: int):
+    """Retrieve all saved goals for a learner, with active goal first."""
+    return db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id
+    ).order_by(
+        (LearnerGoal.status == "active").desc(),
+        LearnerGoal.created_at.desc()
+    ).all()
+
+def update_or_create_goal(db: Session, learner_id: int, title: str, target_role: str, timeline_months: int):
+    """
+    Update the learner's active goal if one already exists (used during onboarding & profile edits),
+    or create the initial goal if none exists yet. This prevents duplicate goals on onboarding.
+    """
+    existing_goal = db.query(LearnerGoal).filter(
         LearnerGoal.learner_id == learner_id,
         LearnerGoal.status == "active"
-    ).all()
-    for g in existing_goals:
-        g.status = "superseded"
-    db.commit()
+    ).order_by(LearnerGoal.created_at.desc()).first()
+
+    if not existing_goal:
+        existing_goal = db.query(LearnerGoal).filter(
+            LearnerGoal.learner_id == learner_id
+        ).order_by(LearnerGoal.created_at.desc()).first()
+
+    if existing_goal:
+        existing_goal.title = title
+        existing_goal.target_role = target_role
+        existing_goal.timeline_months = timeline_months
+        existing_goal.status = "active"
+        db.commit()
+        db.refresh(existing_goal)
+
+        # Refresh GoalSkillRequirements for this goal
+        db.query(GoalSkillRequirement).filter(GoalSkillRequirement.goal_id == existing_goal.id).delete()
+        db.commit()
+
+        all_skills = db.query(Skill).all()
+        skills_map = {s.name: s for s in all_skills}
+        existing_ls_ids = {ls.skill_id for ls in db.query(LearnerSkill).filter(LearnerSkill.learner_id == learner_id).all()}
+        
+        requirements = derive_skill_requirements(target_role, title, all_skills)
+        for skill_name, required_prof, weight in requirements:
+            if skill_name in skills_map:
+                skill_obj = skills_map[skill_name]
+                req = GoalSkillRequirement(
+                    goal_id=existing_goal.id,
+                    skill_id=skill_obj.id,
+                    required_proficiency=float(required_prof),
+                    weight=float(weight)
+                )
+                db.add(req)
+                if skill_obj.id not in existing_ls_ids:
+                    ls = LearnerSkill(
+                        learner_id=learner_id,
+                        skill_id=skill_obj.id,
+                        self_reported_level=0.0,
+                        system_confidence=0.0
+                    )
+                    db.add(ls)
+                    existing_ls_ids.add(skill_obj.id)
+        db.commit()
+
+        from services.roadmap_service import generate_roadmap
+        generate_roadmap(db, learner_id, goal_id=existing_goal.id)
+        return existing_goal
+
+    return create_goal(db, learner_id, title, target_role, timeline_months, set_active=True)
+
+def create_goal(db: Session, learner_id: int, title: str, target_role: str, timeline_months: int, set_active: bool = True):
+    """Create a goal for a learner (maximum of 3), attach skill requirements, and generate roadmap."""
+    existing_goals_count = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id).count()
+    if existing_goals_count >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum of 3 learning goals reached. Please delete an existing goal before adding a new one."
+        )
+
+    if set_active:
+        existing_active = db.query(LearnerGoal).filter(
+            LearnerGoal.learner_id == learner_id,
+            LearnerGoal.status == "active"
+        ).all()
+        for g in existing_active:
+            g.status = "inactive"
+        db.commit()
 
     goal = LearnerGoal(
         learner_id=learner_id,
         title=title,
         target_role=target_role,
         timeline_months=timeline_months,
-        status="active"
+        status="active" if set_active else "inactive"
     )
     db.add(goal)
     db.commit()
@@ -174,4 +252,112 @@ def create_goal(db: Session, learner_id: int, title: str, target_role: str, time
                 existing_ls_ids.add(skill_obj.id)
             
     db.commit()
+
+    # Automatically generate an independent roadmap for this goal
+    from services.roadmap_service import generate_roadmap
+    generate_roadmap(db, learner_id, goal_id=goal.id)
+
     return goal
+
+def activate_goal(db: Session, learner_id: int, goal_id: int):
+    """Switch active goal to goal_id and ensure its roadmap is generated."""
+    goal = db.query(LearnerGoal).filter(
+        LearnerGoal.id == goal_id,
+        LearnerGoal.learner_id == learner_id
+    ).first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+
+    all_goals = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id).all()
+    for g in all_goals:
+        g.status = "active" if g.id == goal_id else "inactive"
+    db.commit()
+    db.refresh(goal)
+
+    # Ensure roadmap exists for this goal
+    from models.roadmap import Roadmap
+    from services.roadmap_service import generate_roadmap
+    rm = db.query(Roadmap).filter(
+        Roadmap.learner_id == learner_id,
+        Roadmap.goal_id == goal.id,
+        Roadmap.status.in_(["active", "completed"])
+    ).first()
+    if not rm:
+        generate_roadmap(db, learner_id, goal_id=goal.id)
+
+    return goal
+
+def delete_goal(db: Session, learner_id: int, goal_id: int):
+    """Safely delete a goal and its dependent data, reassigning active status if needed."""
+    goal = db.query(LearnerGoal).filter(
+        LearnerGoal.id == goal_id,
+        LearnerGoal.learner_id == learner_id
+    ).first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+
+    all_goals = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id).all()
+    if len(all_goals) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your only learning goal. You must have at least one active goal."
+        )
+
+    was_active = (goal.status == "active")
+    new_active_goal = None
+
+    if was_active:
+        remaining_goals = [g for g in all_goals if g.id != goal_id]
+        if remaining_goals:
+            new_active_goal = remaining_goals[0]
+            new_active_goal.status = "active"
+            for g in remaining_goals[1:]:
+                g.status = "inactive"
+            db.commit()
+            
+            # Ensure new active goal has roadmap
+            from models.roadmap import Roadmap
+            from services.roadmap_service import generate_roadmap
+            rm = db.query(Roadmap).filter(
+                Roadmap.learner_id == learner_id,
+                Roadmap.goal_id == new_active_goal.id,
+                Roadmap.status.in_(["active", "completed"])
+            ).first()
+            if not rm:
+                generate_roadmap(db, learner_id, goal_id=new_active_goal.id)
+
+    # Cascade delete roadmap data for the goal
+    from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem
+    from models.assessment import Assessment, AssessmentQuestion, AssessmentAttempt
+
+    roadmaps = db.query(Roadmap).filter(Roadmap.goal_id == goal_id).all()
+    for rm in roadmaps:
+        milestones = db.query(RoadmapMilestone).filter(RoadmapMilestone.roadmap_id == rm.id).all()
+        for ms in milestones:
+            # Delete assessments tied to this milestone
+            assessments = db.query(Assessment).filter(Assessment.milestone_id == ms.id).all()
+            for a in assessments:
+                db.query(AssessmentAttempt).filter(AssessmentAttempt.assessment_id == a.id).delete()
+                db.query(AssessmentQuestion).filter(AssessmentQuestion.assessment_id == a.id).delete()
+                db.delete(a)
+            db.query(MilestoneItem).filter(MilestoneItem.milestone_id == ms.id).delete()
+            db.delete(ms)
+        db.delete(rm)
+
+    db.query(GoalSkillRequirement).filter(GoalSkillRequirement.goal_id == goal_id).delete()
+    db.delete(goal)
+    db.commit()
+
+    remaining = db.query(LearnerGoal).filter(LearnerGoal.learner_id == learner_id).order_by(
+        (LearnerGoal.status == "active").desc(),
+        LearnerGoal.created_at.desc()
+    ).all()
+    if not new_active_goal:
+        new_active_goal = next((g for g in remaining if g.status == "active"), None)
+
+    return {
+        "status": "success",
+        "deleted_goal_id": goal_id,
+        "active_goal": new_active_goal,
+        "goals": remaining
+    }

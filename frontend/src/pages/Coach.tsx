@@ -8,7 +8,7 @@ import { Send, Bot, Sparkles } from 'lucide-react';
 import { ChatMessage } from '../types';
 
 export default function Coach() {
-  const { currentLearner } = useAppStore();
+  const { currentLearner, goalsVersion, activeGoal } = useAppStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,15 +30,16 @@ export default function Coach() {
         if (history && history.length > 0) {
           setMessages(history);
         } else {
+          const roleText = activeGoal?.target_role || 'your chosen career track';
           setMessages([{ 
             role: 'assistant', 
-            content: `Hi ${currentLearner.name || 'there'}! I am your NeuronPath AI Learning Coach. I can help you understand complex concepts, analyze your skill gaps, guide your roadmap, and suggest the best next steps. What would you like to explore today?` 
+            content: `Hi ${currentLearner.name || 'there'}! I am your NeuronPath AI Learning Coach for ${roleText}. I can help you understand complex concepts, analyze your skill gaps, guide your roadmap, and suggest the best next steps. What would you like to explore today?` 
           }]);
         }
       })
       .catch(console.error)
       .finally(() => setInitialLoad(false));
-  }, [currentLearner]);
+  }, [currentLearner, goalsVersion, activeGoal?.id]);
 
   useEffect(() => { 
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); 

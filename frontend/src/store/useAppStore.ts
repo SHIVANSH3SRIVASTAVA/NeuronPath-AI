@@ -43,6 +43,12 @@ interface AppState {
   setCurrentLearner: (learner: Learner | null) => void;
   isOnboarded: boolean;
   setOnboarded: (status: boolean) => void;
+  goals: import('../types').LearnerGoal[];
+  activeGoal: import('../types').LearnerGoal | null;
+  goalsVersion: number;
+  setGoals: (goals: import('../types').LearnerGoal[]) => void;
+  setActiveGoal: (goal: import('../types').LearnerGoal | null) => void;
+  triggerGoalUpdate: () => void;
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -61,16 +67,22 @@ export const useAppStore = create<AppState>()(
       token: null,
       currentLearner: null,
       isAuthenticated: false,
+      goals: [],
+      activeGoal: null,
+      goalsVersion: 0,
       setAuth: (token, learner) => {
         try {
           localStorage.setItem('neuronpath-token', token);
         } catch (e) {}
-        set({ 
+        set((state) => ({ 
           token, 
           currentLearner: learner, 
           isAuthenticated: true, 
-          isOnboarded: true 
-        });
+          isOnboarded: true,
+          goals: [],
+          activeGoal: null,
+          goalsVersion: state.goalsVersion + 1
+        }));
       },
       setCurrentLearner: (learner) => set({ 
         currentLearner: learner,
@@ -78,6 +90,21 @@ export const useAppStore = create<AppState>()(
       }),
       isOnboarded: false,
       setOnboarded: (status) => set({ isOnboarded: status }),
+      setGoals: (goals) => {
+        const active = goals.find(g => g.status === 'active') || goals[0] || null;
+        set({ goals, activeGoal: active });
+      },
+      setActiveGoal: (goal) => {
+        set((state) => ({
+          activeGoal: goal,
+          goals: state.goals.map(g => ({
+            ...g,
+            status: g.id === goal?.id ? 'active' : 'inactive'
+          })),
+          goalsVersion: state.goalsVersion + 1
+        }));
+      },
+      triggerGoalUpdate: () => set((state) => ({ goalsVersion: state.goalsVersion + 1 })),
       sidebarOpen: false,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -100,7 +127,10 @@ export const useAppStore = create<AppState>()(
           token: null, 
           currentLearner: null, 
           isAuthenticated: false, 
-          isOnboarded: false 
+          isOnboarded: false,
+          goals: [],
+          activeGoal: null,
+          goalsVersion: 0
         });
       },
     }),
@@ -112,6 +142,8 @@ export const useAppStore = create<AppState>()(
         isAuthenticated: state.isAuthenticated,
         isOnboarded: state.isOnboarded,
         theme: state.theme,
+        goals: state.goals,
+        activeGoal: state.activeGoal,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

@@ -12,7 +12,7 @@ import { Sparkles, Trophy, CheckCircle2, XCircle, ArrowLeft, ArrowRight, Map, Al
 export default function AssessmentPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentLearner } = useAppStore();
+  const { currentLearner, goalsVersion, activeGoal } = useAppStore();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function AssessmentPage() {
         })
         .finally(() => setLoading(false));
     }
-  }, [id, currentLearner]);
+  }, [id, currentLearner, goalsVersion, activeGoal?.id]);
 
   const handleGenerate = async () => {
     if (!currentLearner) return;

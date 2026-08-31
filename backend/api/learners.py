@@ -4,7 +4,7 @@ from database import get_db
 from schemas.learner import LearnerCreate, LearnerResponse, LearnerUpdate, OnboardingRequest, OnboardingResponse
 from schemas.roadmap import GoalResponse, GoalRequest, RoadmapResponse
 from services.learner_service import create_learner, get_learner, update_learner
-from services.goal_service import create_goal
+from services.goal_service import create_goal, update_or_create_goal
 from services.roadmap_service import generate_roadmap, recalculate_roadmap_milestone_statuses, get_next_action
 from ai.provider import LLMProvider
 from ai.onboarding import extract_goal_from_text
@@ -131,7 +131,7 @@ async def onboard_learner(learner_id: int, req: OnboardingRequest, db: Session =
     target_role = goal_data.get("target_role") or "Software Professional"
     timeline_months = int(goal_data.get("timeline_months") or 6)
     
-    goal = create_goal(db, learner_id, goal_title, target_role, timeline_months)
+    goal = update_or_create_goal(db, learner_id, goal_title, target_role, timeline_months)
     
     # Register known skills
     known_skills = goal_data.get("known_skills", [])
@@ -178,7 +178,7 @@ def set_or_update_goal(learner_id: int, req: CustomGoalUpdateRequest, db: Sessio
         db_learner.weekly_hours = req.weekly_hours
     db.commit()
     
-    goal = create_goal(db, learner_id, req.title, req.target_role, req.timeline_months)
+    goal = update_or_create_goal(db, learner_id, req.title, req.target_role, req.timeline_months)
     
     # Update known skills
     skill_map = {s.name: s for s in db.query(Skill).all()}
@@ -226,13 +226,27 @@ def create_learner_roadmap(learner_id: int, payload: Optional[ActionPayload] = N
 
 @router.get("/{learner_id}/roadmap", response_model=RoadmapResponse)
 def get_learner_roadmap(learner_id: int, db: Session = Depends(get_db), _access: Optional[Learner] = Depends(verify_learner_access)):
-    roadmap = db.query(Roadmap).filter(
-        Roadmap.learner_id == learner_id, 
-        Roadmap.status.in_(["active", "completed"])
-    ).order_by(Roadmap.created_at.desc()).first()
-    
-    if not roadmap:
-        generate_roadmap(db, learner_id)
+    active_goal = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id,
+        LearnerGoal.status == "active"
+    ).first()
+
+    roadmap = None
+    if active_goal:
+        roadmap = db.query(Roadmap).filter(
+            Roadmap.learner_id == learner_id,
+            Roadmap.goal_id == active_goal.id,
+            Roadmap.status.in_(["active", "completed"])
+        ).order_by(Roadmap.created_at.desc()).first()
+        
+        if not roadmap:
+            generate_roadmap(db, learner_id, goal_id=active_goal.id)
+            roadmap = db.query(Roadmap).filter(
+                Roadmap.learner_id == learner_id,
+                Roadmap.goal_id == active_goal.id,
+                Roadmap.status.in_(["active", "completed"])
+            ).order_by(Roadmap.created_at.desc()).first()
+    else:
         roadmap = db.query(Roadmap).filter(
             Roadmap.learner_id == learner_id, 
             Roadmap.status.in_(["active", "completed"])

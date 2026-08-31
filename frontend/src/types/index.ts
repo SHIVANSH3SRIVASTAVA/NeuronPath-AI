@@ -56,6 +56,7 @@ export interface LearnerGoal {
   target_role: string;
   timeline_months: number;
   status: string;
+  created_at?: string;
 }
 
 export interface RoadmapMilestone {

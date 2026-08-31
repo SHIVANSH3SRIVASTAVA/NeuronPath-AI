@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from models.assessment import AssessmentAttempt
-from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem
+from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem, LearnerGoal
 from models.resource import Resource
 from .skill_service import update_learner_skill
 
@@ -12,8 +12,21 @@ def adapt_after_assessment(db: Session, learner_id: int, attempt: AssessmentAtte
     for skill_id_str, skill_score in attempt.skill_scores.items():
         update_learner_skill(db, learner_id, int(skill_id_str), demonstrated_level=skill_score)
         
-    # 2. Get current roadmap and milestones
-    roadmap = db.query(Roadmap).filter(Roadmap.learner_id == learner_id, Roadmap.status == "active").first()
+    # 2. Get current active goal and roadmap
+    active_goal = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id,
+        LearnerGoal.status == "active"
+    ).first()
+    
+    roadmap = None
+    if active_goal:
+        roadmap = db.query(Roadmap).filter(
+            Roadmap.learner_id == learner_id,
+            Roadmap.goal_id == active_goal.id,
+            Roadmap.status == "active"
+        ).first()
+    if not roadmap:
+        roadmap = db.query(Roadmap).filter(Roadmap.learner_id == learner_id, Roadmap.status == "active").first()
     if not roadmap:
         return {"actions": [], "score": score}
         

@@ -22,10 +22,32 @@ def create_roadmap(learner_id: int, db: Session = Depends(get_db)):
 
 @router.get("", response_model=RoadmapResponse)
 def get_roadmap(learner_id: int, db: Session = Depends(get_db)):
-    roadmap = db.query(Roadmap).filter(
-        Roadmap.learner_id == learner_id, 
-        Roadmap.status.in_(["active", "completed"])
-    ).order_by(Roadmap.created_at.desc()).first()
+    active_goal = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id,
+        LearnerGoal.status == "active"
+    ).first()
+
+    roadmap = None
+    if active_goal:
+        roadmap = db.query(Roadmap).filter(
+            Roadmap.learner_id == learner_id,
+            Roadmap.goal_id == active_goal.id,
+            Roadmap.status.in_(["active", "completed"])
+        ).order_by(Roadmap.created_at.desc()).first()
+        
+        if not roadmap:
+            from services.roadmap_service import generate_roadmap
+            generate_roadmap(db, learner_id, goal_id=active_goal.id)
+            roadmap = db.query(Roadmap).filter(
+                Roadmap.learner_id == learner_id,
+                Roadmap.goal_id == active_goal.id,
+                Roadmap.status.in_(["active", "completed"])
+            ).order_by(Roadmap.created_at.desc()).first()
+    else:
+        roadmap = db.query(Roadmap).filter(
+            Roadmap.learner_id == learner_id, 
+            Roadmap.status.in_(["active", "completed"])
+        ).order_by(Roadmap.created_at.desc()).first()
     
     if not roadmap:
         raise HTTPException(status_code=404, detail="No active roadmap found")

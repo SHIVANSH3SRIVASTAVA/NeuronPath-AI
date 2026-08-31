@@ -56,4 +56,34 @@ export const deleteLearner = async (id: number): Promise<{ status: string; messa
   }
 };
 
+export const getLearnerGoals = async (learnerId?: number) => {
+  const { data } = await apiClient.get<import('../types').LearnerGoal[]>('/goals');
+  return data;
+};
+
+export const createLearnerGoal = async (payload: {
+  title: string;
+  target_role: string;
+  timeline_months?: number;
+  set_active?: boolean;
+}) => {
+  const { data } = await apiClient.post<import('../types').LearnerGoal>('/goals', payload);
+  return data;
+};
+
+export const activateLearnerGoal = async (goalId: number) => {
+  const { data } = await apiClient.put<import('../types').LearnerGoal>(`/goals/${goalId}/activate`);
+  return data;
+};
+
+export const deleteLearnerGoal = async (goalId: number) => {
+  const { data } = await apiClient.delete<{
+    status: string;
+    deleted_goal_id: number;
+    active_goal: import('../types').LearnerGoal | null;
+    goals: import('../types').LearnerGoal[];
+  }>(`/goals/${goalId}`);
+  return data;
+};
+
 

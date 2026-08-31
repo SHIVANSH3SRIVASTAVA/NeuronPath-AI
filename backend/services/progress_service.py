@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, selectinload, joinedload
-from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem
+from models.roadmap import Roadmap, RoadmapMilestone, MilestoneItem, LearnerGoal, GoalSkillRequirement
 from models.skill import LearnerSkill
 from models.resource import Resource
 from models.assessment import AssessmentAttempt, Assessment
@@ -8,16 +8,31 @@ from models.learner import Learner
 from datetime import datetime
 
 def get_progress(db: Session, learner_id: int):
-    """Calculate comprehensive progress data for a learner with semantic timeline growth."""
+    """Calculate comprehensive progress data for a learner with semantic timeline growth for active goal."""
     learner = db.query(Learner).filter(Learner.id == learner_id).first()
 
-    # Find latest roadmap (active or completed)
-    roadmap = db.query(Roadmap).options(
-        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource)
-    ).filter(
-        Roadmap.learner_id == learner_id, 
-        Roadmap.status.in_(["active", "completed"])
-    ).order_by(Roadmap.created_at.desc()).first()
+    active_goal = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id,
+        LearnerGoal.status == "active"
+    ).first()
+
+    # Find latest roadmap for active goal (active or completed)
+    roadmap = None
+    if active_goal:
+        roadmap = db.query(Roadmap).options(
+            selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource)
+        ).filter(
+            Roadmap.learner_id == learner_id,
+            Roadmap.goal_id == active_goal.id,
+            Roadmap.status.in_(["active", "completed"])
+        ).order_by(Roadmap.created_at.desc()).first()
+    else:
+        roadmap = db.query(Roadmap).options(
+            selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource)
+        ).filter(
+            Roadmap.learner_id == learner_id, 
+            Roadmap.status.in_(["active", "completed"])
+        ).order_by(Roadmap.created_at.desc()).first()
     
     milestones = []
     milestones_total = 0
@@ -32,8 +47,13 @@ def get_progress(db: Session, learner_id: int):
     if milestones_total > 0 and milestones_completed == milestones_total:
         overall_progress = 100.0
     
-    # Calculate skill distribution & categorized lists
+    # Calculate skill distribution for skills required by active goal
     skills = db.query(LearnerSkill).filter(LearnerSkill.learner_id == learner_id).all()
+    if active_goal:
+        req_skill_ids = {r.skill_id for r in db.query(GoalSkillRequirement).filter(GoalSkillRequirement.goal_id == active_goal.id).all()}
+        if req_skill_ids:
+            skills = [s for s in skills if s.skill_id in req_skill_ids]
+
     all_skills_map = {s.skill_id: s for s in skills}
     
     categorized_skills = {

@@ -151,16 +151,22 @@ def recalculate_roadmap_milestone_statuses(db: Session, roadmap_id: int):
 
     db.commit()
 
-def generate_roadmap(db: Session, learner_id: int):
+def generate_roadmap(db: Session, learner_id: int, goal_id: Optional[int] = None):
     """
     Dynamically decomposes the learner's goal into a fine-grained, coherent milestone graph.
     Each milestone attaches strictly relevant learning resources teaching its primary skill.
     """
     learner = db.query(Learner).filter(Learner.id == learner_id).first()
-    goal = db.query(LearnerGoal).filter(
-        LearnerGoal.learner_id == learner_id, 
-        LearnerGoal.status.in_(["active", "completed"])
-    ).first()
+    if goal_id is not None:
+        goal = db.query(LearnerGoal).filter(
+            LearnerGoal.id == goal_id,
+            LearnerGoal.learner_id == learner_id
+        ).first()
+    else:
+        goal = db.query(LearnerGoal).filter(
+            LearnerGoal.learner_id == learner_id, 
+            LearnerGoal.status.in_(["active", "completed"])
+        ).order_by(LearnerGoal.created_at.desc()).first()
     
     if not goal:
         return None
@@ -178,8 +184,10 @@ def generate_roadmap(db: Session, learner_id: int):
     # Priority-weighted topological learning order
     order = get_learning_order(req_skill_ids, learner_skills, graph, skill_weights)
     
+    # Supersede only existing roadmaps for this specific goal
     old_roadmaps = db.query(Roadmap).filter(
-        Roadmap.learner_id == learner_id, 
+        Roadmap.learner_id == learner_id,
+        Roadmap.goal_id == goal.id,
         Roadmap.status.in_(["active", "completed"])
     ).all()
     for old_r in old_roadmaps:
@@ -293,27 +301,30 @@ def generate_roadmap(db: Session, learner_id: int):
     return roadmap
 
 def get_next_action(db: Session, learner_id: int):
+    goal = db.query(LearnerGoal).filter(
+        LearnerGoal.learner_id == learner_id, 
+        LearnerGoal.status == "active"
+    ).first()
+    
+    if not goal:
+        return {
+            "action": "create_goal", 
+            "title": "Set Your Goal",
+            "description": "Describe your target career role to generate your adaptive path.",
+            "message": "You need to set a goal first."
+        }
+        
     roadmap = db.query(Roadmap).filter(
-        Roadmap.learner_id == learner_id, 
+        Roadmap.learner_id == learner_id,
+        Roadmap.goal_id == goal.id,
         Roadmap.status.in_(["active", "completed"])
     ).order_by(Roadmap.created_at.desc()).first()
     
     if not roadmap:
-        goal = db.query(LearnerGoal).filter(
-            LearnerGoal.learner_id == learner_id, 
-            LearnerGoal.status.in_(["active", "completed"])
-        ).first()
-        if not goal:
-            return {
-                "action": "create_goal", 
-                "title": "Set Your Goal",
-                "description": "Describe your target career role to generate your adaptive path.",
-                "message": "You need to set a goal first."
-            }
         return {
             "action": "create_goal", 
             "title": "Build Your Roadmap",
-            "description": "Ready to create your personalized step-by-step roadmap.",
+            "description": f"Ready to create your personalized roadmap for {goal.target_role}.",
             "message": "Build your roadmap to start learning."
         }
         

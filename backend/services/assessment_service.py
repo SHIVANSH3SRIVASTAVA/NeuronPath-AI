@@ -183,16 +183,24 @@ def generate_assessment(db: Session, learner_id: int, milestone_id: Optional[int
     # 1. Retrieve learner's active goal
     goal = db.query(LearnerGoal).filter(
         LearnerGoal.learner_id == learner_id,
-        LearnerGoal.status.in_(["active", "completed"])
-    ).order_by(LearnerGoal.created_at.desc()).first()
+        LearnerGoal.status == "active"
+    ).first()
     
     target_role = goal.target_role if goal else "Software Professional"
     
-    # 2. Retrieve roadmap and milestone partitioning
-    roadmap = db.query(Roadmap).filter(
-        Roadmap.learner_id == learner_id,
-        Roadmap.status.in_(["active", "completed"])
-    ).order_by(Roadmap.created_at.desc()).first()
+    # 2. Retrieve roadmap and milestone partitioning for active goal
+    roadmap = None
+    if goal:
+        roadmap = db.query(Roadmap).filter(
+            Roadmap.learner_id == learner_id,
+            Roadmap.goal_id == goal.id,
+            Roadmap.status.in_(["active", "completed"])
+        ).order_by(Roadmap.created_at.desc()).first()
+    if not roadmap:
+        roadmap = db.query(Roadmap).filter(
+            Roadmap.learner_id == learner_id,
+            Roadmap.status.in_(["active", "completed"])
+        ).order_by(Roadmap.created_at.desc()).first()
 
     all_milestones: List[RoadmapMilestone] = []
     target_milestone: Optional[RoadmapMilestone] = None

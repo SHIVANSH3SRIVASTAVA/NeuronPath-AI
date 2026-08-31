@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { OnboardingChat } from '../components/onboarding/OnboardingChat';
 import { ProfileConfirmation } from '../components/onboarding/ProfileConfirmation';
 import { useAppStore } from '../store/useAppStore';
-import { createLearner, onboardLearner, updateLearner, updateLearnerGoal, getLearner } from '../api/learner';
+import { createLearner, onboardLearner, updateLearner, updateLearnerGoal, getLearner, getLearnerGoals } from '../api/learner';
 import { generateRoadmap } from '../api/roadmap';
 import { OnboardingResult } from '../types';
 import { AlertCircle } from 'lucide-react';
@@ -112,6 +112,13 @@ export default function Onboarding() {
       const refreshedLearner = await getLearner(id);
       setCurrentLearner(refreshedLearner);
       setOnboarded(true);
+
+      try {
+        const userGoals = await getLearnerGoals(id);
+        useAppStore.getState().setGoals(userGoals);
+      } catch (gErr) {
+        console.warn('Goals store sync:', gErr);
+      }
 
       navigate('/dashboard');
     } catch (err: any) {
