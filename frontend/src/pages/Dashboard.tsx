@@ -96,7 +96,7 @@ export default function Dashboard() {
     );
   }
 
-  const goalTitle = roadmap?.goal?.title || 'Personalized Learning Goal';
+  const goalTitle = roadmap?.goal?.target_role || roadmap?.goal?.title || 'Personalized Learning Goal';
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10">

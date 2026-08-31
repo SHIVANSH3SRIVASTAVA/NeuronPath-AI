@@ -35,7 +35,8 @@ def get_roadmap(learner_id: int, db: Session = Depends(get_db)):
     
     loaded_roadmap = db.query(Roadmap).options(
         selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.resource),
-        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.project)
+        selectinload(Roadmap.milestones).selectinload(RoadmapMilestone.items).joinedload(MilestoneItem.project),
+        joinedload(Roadmap.goal)
     ).filter(Roadmap.id == roadmap.id).first()
     
     return RoadmapResponse.model_validate(loaded_roadmap)

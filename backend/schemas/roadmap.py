@@ -47,6 +47,7 @@ class RoadmapResponse(BaseModel):
     goal_id: int
     status: str
     milestones: Optional[List[MilestoneResponse]] = []
+    goal: Optional[GoalResponse] = None
     
     model_config = ConfigDict(from_attributes=True)
 
